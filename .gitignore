@@ -1,0 +1,26 @@
+# Python 및 개발 환경
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+.env
+*.log
+
+# 운영체제·편집기 파일
+.DS_Store
+.vscode/
+
+# 원본 데이터와 재생성 가능한 산출물
+data/raw/*
+!data/raw/README.md
+data/processed/*
+!data/processed/README.md
+experiments/runs/
+
+# 모델 가중치
+models/*.pt
+models/*.pth
+models/*.ckpt
+models/*.onnx
+models/*.pkl
