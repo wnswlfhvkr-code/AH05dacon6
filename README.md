@@ -34,6 +34,21 @@ python -m src.train --config configs/baseline.yaml
 
 새 모델은 `src/models/`에 생성 함수를 추가하고, `src/models/__init__.py`의 `MODEL_BUILDERS`에 등록한 뒤 `configs/`에 해당 모델의 설정 파일을 추가합니다.
 
+현재 등록된 모델은 `xgboost`, `lightgbm`, `linear_svc`,
+`wc_tfidf_lsvc_lgbm`입니다. 개별 실행 예시는 다음과 같습니다.
+
+```bash
+python -m src.train --config configs/lightgbm.yaml
+python -m src.train --config configs/linear_svc.yaml
+python -m src.train --config configs/jsj_wc_tfidf_lsvc_lgbm_v1.yaml
+```
+
+`jsj_wc_tfidf_lsvc_lgbm_v1`은 기존 Public 0.3714981583 제출의 핵심 구성인
+Word+Char TF-IDF, LinearSVC 95%, 트리 모델 5%, 클래스 보정을
+협업 저장소에서 다시 학습할 수 있도록 구성한 버전입니다. 기존 제출은
+여러 OOF 산출물을 결합했으므로 새 실행 결과가 기존 제출 파일과 완전히
+같다고 가정하지 않으며, 동일한 검증 조건에서 다시 비교해야 합니다.
+
 ## 데이터 품질 점검
 
 ```bash

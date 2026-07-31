@@ -1,8 +1,11 @@
 pytest==8.3.5
 PyYAML==6.0.2
 xgboost==3.3.0
+lightgbm
 pandas
 scikit-learn
+numpy
+scipy
 jupyter
 matplotlib
 seaborn

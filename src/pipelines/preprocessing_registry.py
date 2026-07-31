@@ -2,10 +2,12 @@
 
 from src.pipelines.pipeline_baseline import BaselinePreprocessingPipeline
 from src.pipelines.pipeline_em_v1 import EMV1PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v1 import JSJV1PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
     "em_v1": EMV1PreprocessingPipeline,
+    "jsj_v1": JSJV1PreprocessingPipeline,
 }
 
 
