@@ -17,7 +17,7 @@
 ## 작업 순서
 
 1. 원본 데이터는 `data/raw/`에 준비하고 GitHub에는 커밋하지 않습니다.
-2. `configs/xgboost_baseline.yaml`에 베이스라인의 데이터 분할·시드·모델 조건을 기록합니다.
+2. `configs/baseline.yaml`에 베이스라인의 데이터 분할·시드·모델 조건을 기록합니다.
 3. 전처리·학습·평가 코드를 `src/`에 구현합니다.
 4. 결과를 `experiments/baseline.md`에 기록합니다.
 5. 기능별 브랜치에서 작업하고 Pull Request로 검토합니다.
@@ -27,12 +27,24 @@
 데이터 파일 `train.csv`, `test.csv`, `sample_submission.csv`을 `data/raw/`에 둔 뒤 아래 명령을 실행합니다.
 
 ```bash
-python -m src.train --config configs/xgboost_baseline.yaml
+python -m src.train --config configs/baseline.yaml
 ```
 
-검증 Macro F1은 화면과 `data/processed/xgboost_baseline_metrics.json`에 기록되며, 제출 파일은 `data/processed/xgboost_baseline_submission.csv`에 생성됩니다.
+검증 Macro F1은 화면과 `data/processed/baseline_metrics.json`에 기록되며, 제출 파일은 `data/processed/baseline_submission.csv`에 생성됩니다.
 
 새 모델은 `src/models/`에 생성 함수를 추가하고, `src/models/__init__.py`의 `MODEL_BUILDERS`에 등록한 뒤 `configs/`에 해당 모델의 설정 파일을 추가합니다.
+
+## 데이터 품질 점검
+
+```bash
+python -m src.data_quality --config configs/baseline.yaml
+```
+
+## 전처리 파이프라인
+
+설정 파일의 `preprocessing.name`에서 전처리 파이프라인을 선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다. 순서 인코더는 학습 데이터에 없는 값을 `-1`로 변환합니다. 새 파이프라인은 `src/pipelines/`에 추가한 뒤 설정 파일의 이름만 바꿔 같은 모델 조건에서 비교합니다.
+
+사용 가능한 파이프라인은 `baseline`과 `em_v1`입니다. `configs/test_001.yaml`은 `em_v1`을 사용합니다.
 
 ## 실행 환경
 

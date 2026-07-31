@@ -13,7 +13,7 @@ import yaml
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from src.models import MODEL_BUILDERS
-from src.preprocess import TabularPreprocessor
+from src.pipelines.preprocessing_registry import create_preprocessing_pipeline
 
 
 def load_config(path: Path) -> dict:
@@ -51,6 +51,7 @@ def write_experiment_report(
 | --- | --- |
 | 실행 시각 | {datetime.now().astimezone().isoformat(timespec='seconds')} |
 | 모델 | {model_config['name']} |
+| 전처리 파이프라인 | {config['preprocessing']['name']} |
 | 학습 데이터 행 수 | {train_rows} |
 | 피처 수 | {feature_count} |
 | 검증 Macro F1 | {validation_f1:.6f} |
@@ -69,7 +70,7 @@ def write_experiment_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, default=Path("configs/xgboost_baseline.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/baseline.yaml"))
     args = parser.parse_args()
     config = load_config(args.config)
     experiment_name = config["project"]["experiment_name"]
@@ -86,21 +87,25 @@ def main() -> None:
 
     features = train.drop(columns=[target, identifier])
     labels = train[target]
-    preprocessor = TabularPreprocessor().fit(features, labels)
-    encoded_features = preprocessor.transform(features)
-
-    train_x, valid_x, train_y, valid_y = train_test_split(
-        encoded_features,
-        preprocessor.encode_labels(labels),
+    train_features, valid_features, train_labels, valid_labels = train_test_split(
+        features, labels,
         test_size=config["training"]["validation_fraction"],
         random_state=config["project"]["seed"],
-        stratify=preprocessor.encode_labels(labels) if config["training"]["stratify"] else None,
+        stratify=labels if config["training"]["stratify"] else None,
     )
+    preprocessing_config = config["preprocessing"]
+    validation_preprocessor = create_preprocessing_pipeline(preprocessing_config).fit(train_features, train_labels)
+    train_x = validation_preprocessor.transform(train_features)
+    valid_x = validation_preprocessor.transform(valid_features)
+    train_y = validation_preprocessor.encode_labels(train_labels)
+    valid_y = validation_preprocessor.encode_labels(valid_labels)
     validation_model = build_model(config)
     validation_model.fit(train_x, train_y)
     validation_predictions = validation_model.predict(valid_x)
     validation_f1 = f1_score(valid_y, validation_predictions, average="macro")
 
+    preprocessor = create_preprocessing_pipeline(preprocessing_config)
+    encoded_features = preprocessor.fit_transform(features, labels)
     final_model = build_model(config)
     final_model.fit(encoded_features, preprocessor.encode_labels(labels))
     encoded_test = preprocessor.transform(test.drop(columns=[identifier]))
@@ -124,7 +129,7 @@ def main() -> None:
         args.config,
         config,
         train_rows=len(train),
-        feature_count=encoded_features.shape[1],
+        feature_count=preprocessor.summary()["remaining_features"],
         validation_f1=validation_f1,
         submission_path=submission_path,
         artifact_path=artifact_path,
