@@ -585,7 +585,7 @@ def create_figures(
         ecolor="#222222",
         capsize=4,
     )
-    axis.set_title("Repeated CV preprocessing ablation")
+    axis.set_title("3-Fold preprocessing ablation")
     axis.set_xlabel("Macro F1 (mean ± SD)")
     axis.set_ylabel("")
     for index, value in enumerate(plot_data["macro_f1_mean"]):
