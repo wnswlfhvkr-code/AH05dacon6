@@ -10,6 +10,7 @@ from src.pipelines.pipeline_jsj_v1 import (
     JSJV1PreprocessingPipeline,
     TextTreeFeatureBundle,
 )
+from src.pipelines.pipeline_jsj_v2 import JSJV2PreprocessingPipeline
 from src.pipelines.preprocessing_registry import PIPELINES
 
 
@@ -17,15 +18,35 @@ def test_new_models_and_pipeline_are_registered() -> None:
     assert {"xgboost", "lightgbm", "linear_svc", "wc_tfidf_lsvc_lgbm"} <= set(
         MODEL_BUILDERS
     )
-    assert "jsj_v1" in PIPELINES
+    assert {"jsj_v1", "jsj_v2"} <= set(PIPELINES)
 
 
-def test_shared_test_config_references_registered_components() -> None:
+def test_jsj_test_config_references_registered_components() -> None:
     root = Path(__file__).parents[1]
-    with (root / "configs" / "test_001.yaml").open(encoding="utf-8") as file:
+    with (root / "configs" / "test_004.yaml").open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
     assert config["model"]["name"] in MODEL_BUILDERS
     assert config["preprocessing"]["name"] in PIPELINES
+
+
+def test_jsj_v2_pipeline_creates_compact_numeric_features() -> None:
+    features = pd.DataFrame(
+        {
+            "TP53": ["R175H", "WT", "R248Q R273H", "WT"],
+            "BRAF": ["WT", "V600E", "WT", "V600E"],
+            "EGFR": ["WT", "WT", "L858R", None],
+        }
+    )
+    labels = pd.Series(["A", "B", "A", "B"])
+    pipeline = JSJV2PreprocessingPipeline()
+
+    transformed = pipeline.fit_transform(features, labels)
+    assert transformed.shape[0] == len(features)
+    assert 0 < transformed.shape[1] < 40
+    assert transformed.select_dtypes(exclude="number").empty
+    assert "total_event_count" in transformed.columns
+    assert "multi_event_gene_count" in transformed.columns
+    assert np.isfinite(transformed.to_numpy()).all()
 
 
 def test_wc_tfidf_pipeline_splits_train_and_transform_without_refitting() -> None:

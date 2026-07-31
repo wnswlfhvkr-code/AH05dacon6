@@ -1,6 +1,6 @@
 project:
   name: AH05dacon6
-  experiment_name: test_001
+  experiment_name: test_004
   seed: 42
   python_version: "3.14"
 
@@ -28,4 +28,4 @@ training:
   metric: macro_f1
 
 preprocessing:
-  name: em_v1
+  name: jsj_v2
