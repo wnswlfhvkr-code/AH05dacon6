@@ -1,0 +1,10 @@
+﻿seed,fold,model,model_label,macro_f1,train_rows,valid_rows,feature_count
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,0.3241997582421974,4134,2067,32768
+42,1,split_event_tfidf,Split-event Word TF-IDF,0.34431951225406654,4134,2067,32768
+42,1,split_event_structural,Split-event Word TF-IDF + structural,0.36470842381230634,4134,2067,32798
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,0.31766325527959427,4134,2067,32768
+42,2,split_event_tfidf,Split-event Word TF-IDF,0.3329027286483933,4134,2067,32768
+42,2,split_event_structural,Split-event Word TF-IDF + structural,0.38056824970688424,4134,2067,32798
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,0.3398765095261572,4134,2067,32768
+42,3,split_event_tfidf,Split-event Word TF-IDF,0.35422274455458547,4134,2067,32768
+42,3,split_event_structural,Split-event Word TF-IDF + structural,0.3857496935638492,4134,2067,32798

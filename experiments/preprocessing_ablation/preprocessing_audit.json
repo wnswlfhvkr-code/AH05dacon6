@@ -1,0 +1,55 @@
+{
+  "train": {
+    "samples": 6201,
+    "genes": 4384,
+    "total_cells": 27185184,
+    "wt_or_no_mutation_cells": 26966291,
+    "missing_cells": 0,
+    "samples_with_missing": 0,
+    "mutation_cells": 218893,
+    "mutation_events": 255164,
+    "multi_event_cells": 22026,
+    "max_events_in_cell": 64,
+    "samples_without_mutation": 94,
+    "mutation_events_per_sample_mean": 41.14884696016772,
+    "position_parse_rate": 1.0,
+    "protein_prefix_events": 0,
+    "unique_raw_events": 115200,
+    "unique_normalized_events": 115200,
+    "mutation_type_counts": {
+      "SUB": 231796,
+      "STOP": 13451,
+      "FS": 9914,
+      "DEL": 3
+    },
+    "unsplit_other_cells": 17947
+  },
+  "test": {
+    "samples": 2546,
+    "genes": 4384,
+    "total_cells": 11161664,
+    "wt_or_no_mutation_cells": 10962497,
+    "missing_cells": 237,
+    "samples_with_missing": 128,
+    "mutation_cells": 198930,
+    "mutation_events": 337512,
+    "multi_event_cells": 63178,
+    "max_events_in_cell": 51,
+    "samples_without_mutation": 31,
+    "mutation_events_per_sample_mean": 132.5655930871956,
+    "position_parse_rate": 1.0,
+    "protein_prefix_events": 0,
+    "unique_raw_events": 134224,
+    "unique_normalized_events": 134224,
+    "mutation_type_counts": {
+      "SUB": 305423,
+      "FS": 25877,
+      "DEL": 2583,
+      "STOP": 1985,
+      "INS": 1097,
+      "DELINS": 545,
+      "OTHER": 2
+    },
+    "unsplit_other_cells": 57160
+  }
+}

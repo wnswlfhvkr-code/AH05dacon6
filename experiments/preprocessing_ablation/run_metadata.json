@@ -1,0 +1,68 @@
+{
+  "train_rows": 6201,
+  "test_rows": 2546,
+  "gene_columns": 4384,
+  "classes": [
+    "ACC",
+    "BLCA",
+    "BRCA",
+    "CESC",
+    "COAD",
+    "DLBC",
+    "GBMLGG",
+    "HNSC",
+    "KIPAN",
+    "KIRC",
+    "LAML",
+    "LGG",
+    "LIHC",
+    "LUAD",
+    "LUSC",
+    "OV",
+    "PAAD",
+    "PCPG",
+    "PRAD",
+    "SARC",
+    "SKCM",
+    "STES",
+    "TGCT",
+    "THCA",
+    "THYM",
+    "UCEC"
+  ],
+  "cv": {
+    "n_splits": 3,
+    "seeds": [
+      42
+    ]
+  },
+  "vectorizer": {
+    "word_ngram_range": [
+      1,
+      2
+    ],
+    "char_ngram_range": [
+      3,
+      5
+    ],
+    "word_hash_features": 32768,
+    "char_hash_features": 0,
+    "sublinear_tf": true
+  },
+  "model": {
+    "C": 0.4,
+    "class_weight": "balanced",
+    "max_iter": 3000,
+    "tol": 0.001
+  },
+  "best_model": {
+    "model": "split_event_structural",
+    "model_label": "Split-event Word TF-IDF + structural",
+    "macro_f1_mean": 0.3770087890276799,
+    "macro_f1_std": 0.010962941139785406,
+    "macro_f1_min": 0.36470842381230634,
+    "macro_f1_max": 0.3857496935638492,
+    "evaluations": 3,
+    "feature_count_mean": 32798.0
+  }
+}

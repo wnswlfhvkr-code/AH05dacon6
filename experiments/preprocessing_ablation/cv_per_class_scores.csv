@@ -1,0 +1,235 @@
+﻿seed,fold,model,model_label,SUBCLASS,f1
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,ACC,0.9019607843137255
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,BLCA,0.26229508196721313
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,BRCA,0.5461689587426326
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,CESC,0.0
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,COAD,0.6153846153846154
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,DLBC,0.4
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,GBMLGG,0.23140495867768596
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,HNSC,0.1875
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,KIPAN,0.12297734627831715
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,KIRC,0.10619469026548672
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,LAML,0.4485981308411215
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,LGG,0.3146067415730337
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,LIHC,0.21978021978021978
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,LUAD,0.15254237288135594
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,LUSC,0.21238938053097345
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,OV,0.2966507177033493
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,PAAD,0.10810810810810811
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,PCPG,0.28846153846153844
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,PRAD,0.25870646766169153
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,SARC,0.16793893129770993
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,SKCM,0.5538461538461539
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,STES,0.3416666666666667
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,TGCT,0.3333333333333333
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,THCA,0.6636771300448431
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,THYM,0.22784810126582278
+42,1,raw_cell_tfidf,Raw-cell Word TF-IDF,UCEC,0.46715328467153283
+42,1,split_event_tfidf,Split-event Word TF-IDF,ACC,0.92
+42,1,split_event_tfidf,Split-event Word TF-IDF,BLCA,0.22580645161290322
+42,1,split_event_tfidf,Split-event Word TF-IDF,BRCA,0.5317460317460317
+42,1,split_event_tfidf,Split-event Word TF-IDF,CESC,0.024691358024691357
+42,1,split_event_tfidf,Split-event Word TF-IDF,COAD,0.6447368421052632
+42,1,split_event_tfidf,Split-event Word TF-IDF,DLBC,0.6666666666666666
+42,1,split_event_tfidf,Split-event Word TF-IDF,GBMLGG,0.226890756302521
+42,1,split_event_tfidf,Split-event Word TF-IDF,HNSC,0.2153846153846154
+42,1,split_event_tfidf,Split-event Word TF-IDF,KIPAN,0.12987012987012986
+42,1,split_event_tfidf,Split-event Word TF-IDF,KIRC,0.11504424778761062
+42,1,split_event_tfidf,Split-event Word TF-IDF,LAML,0.4716981132075472
+42,1,split_event_tfidf,Split-event Word TF-IDF,LGG,0.3146067415730337
+42,1,split_event_tfidf,Split-event Word TF-IDF,LIHC,0.1956521739130435
+42,1,split_event_tfidf,Split-event Word TF-IDF,LUAD,0.18487394957983194
+42,1,split_event_tfidf,Split-event Word TF-IDF,LUSC,0.3025210084033613
+42,1,split_event_tfidf,Split-event Word TF-IDF,OV,0.3238095238095238
+42,1,split_event_tfidf,Split-event Word TF-IDF,PAAD,0.08333333333333333
+42,1,split_event_tfidf,Split-event Word TF-IDF,PCPG,0.29411764705882354
+42,1,split_event_tfidf,Split-event Word TF-IDF,PRAD,0.2926829268292683
+42,1,split_event_tfidf,Split-event Word TF-IDF,SARC,0.1774193548387097
+42,1,split_event_tfidf,Split-event Word TF-IDF,SKCM,0.5454545454545454
+42,1,split_event_tfidf,Split-event Word TF-IDF,STES,0.32340425531914896
+42,1,split_event_tfidf,Split-event Word TF-IDF,TGCT,0.3617021276595745
+42,1,split_event_tfidf,Split-event Word TF-IDF,THCA,0.6666666666666666
+42,1,split_event_tfidf,Split-event Word TF-IDF,THYM,0.23076923076923078
+42,1,split_event_tfidf,Split-event Word TF-IDF,UCEC,0.4827586206896552
+42,1,split_event_structural,Split-event Word TF-IDF + structural,ACC,0.9361702127659575
+42,1,split_event_structural,Split-event Word TF-IDF + structural,BLCA,0.2222222222222222
+42,1,split_event_structural,Split-event Word TF-IDF + structural,BRCA,0.5594989561586639
+42,1,split_event_structural,Split-event Word TF-IDF + structural,CESC,0.028985507246376812
+42,1,split_event_structural,Split-event Word TF-IDF + structural,COAD,0.6762589928057554
+42,1,split_event_structural,Split-event Word TF-IDF + structural,DLBC,0.3333333333333333
+42,1,split_event_structural,Split-event Word TF-IDF + structural,GBMLGG,0.2677165354330709
+42,1,split_event_structural,Split-event Word TF-IDF + structural,HNSC,0.21374045801526717
+42,1,split_event_structural,Split-event Word TF-IDF + structural,KIPAN,0.22492401215805471
+42,1,split_event_structural,Split-event Word TF-IDF + structural,KIRC,0.09523809523809523
+42,1,split_event_structural,Split-event Word TF-IDF + structural,LAML,0.58
+42,1,split_event_structural,Split-event Word TF-IDF + structural,LGG,0.3314285714285714
+42,1,split_event_structural,Split-event Word TF-IDF + structural,LIHC,0.2222222222222222
+42,1,split_event_structural,Split-event Word TF-IDF + structural,LUAD,0.22448979591836735
+42,1,split_event_structural,Split-event Word TF-IDF + structural,LUSC,0.3696682464454976
+42,1,split_event_structural,Split-event Word TF-IDF + structural,OV,0.3238095238095238
+42,1,split_event_structural,Split-event Word TF-IDF + structural,PAAD,0.12345679012345678
+42,1,split_event_structural,Split-event Word TF-IDF + structural,PCPG,0.2978723404255319
+42,1,split_event_structural,Split-event Word TF-IDF + structural,PRAD,0.3524229074889868
+42,1,split_event_structural,Split-event Word TF-IDF + structural,SARC,0.1941747572815534
+42,1,split_event_structural,Split-event Word TF-IDF + structural,SKCM,0.6926829268292682
+42,1,split_event_structural,Split-event Word TF-IDF + structural,STES,0.3598326359832636
+42,1,split_event_structural,Split-event Word TF-IDF + structural,TGCT,0.4576271186440678
+42,1,split_event_structural,Split-event Word TF-IDF + structural,THCA,0.6696428571428571
+42,1,split_event_structural,Split-event Word TF-IDF + structural,THYM,0.225
+42,1,split_event_structural,Split-event Word TF-IDF + structural,UCEC,0.5
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,ACC,0.8363636363636363
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,BLCA,0.2641509433962264
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,BRCA,0.49287169042769857
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,CESC,0.07142857142857142
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,COAD,0.6666666666666666
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,DLBC,0.25
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,GBMLGG,0.2825278810408922
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,HNSC,0.1889763779527559
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,KIPAN,0.17142857142857143
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,KIRC,0.12844036697247707
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,LAML,0.47863247863247865
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,LGG,0.35294117647058826
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,LIHC,0.0898876404494382
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,LUAD,0.17475728155339806
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,LUSC,0.2777777777777778
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,OV,0.32456140350877194
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,PAAD,0.10810810810810811
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,PCPG,0.32432432432432434
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,PRAD,0.2111111111111111
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,SARC,0.07751937984496124
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,SKCM,0.48360655737704916
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,STES,0.340080971659919
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,TGCT,0.32432432432432434
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,THCA,0.6153846153846154
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,THYM,0.25
+42,2,raw_cell_tfidf,Raw-cell Word TF-IDF,UCEC,0.47337278106508873
+42,2,split_event_tfidf,Split-event Word TF-IDF,ACC,0.7931034482758621
+42,2,split_event_tfidf,Split-event Word TF-IDF,BLCA,0.22641509433962265
+42,2,split_event_tfidf,Split-event Word TF-IDF,BRCA,0.5093167701863354
+42,2,split_event_tfidf,Split-event Word TF-IDF,CESC,0.047619047619047616
+42,2,split_event_tfidf,Split-event Word TF-IDF,COAD,0.7088607594936709
+42,2,split_event_tfidf,Split-event Word TF-IDF,DLBC,0.45454545454545453
+42,2,split_event_tfidf,Split-event Word TF-IDF,GBMLGG,0.2641509433962264
+42,2,split_event_tfidf,Split-event Word TF-IDF,HNSC,0.19047619047619047
+42,2,split_event_tfidf,Split-event Word TF-IDF,KIPAN,0.19375
+42,2,split_event_tfidf,Split-event Word TF-IDF,KIRC,0.12380952380952381
+42,2,split_event_tfidf,Split-event Word TF-IDF,LAML,0.5045045045045045
+42,2,split_event_tfidf,Split-event Word TF-IDF,LGG,0.33136094674556216
+42,2,split_event_tfidf,Split-event Word TF-IDF,LIHC,0.13333333333333333
+42,2,split_event_tfidf,Split-event Word TF-IDF,LUAD,0.23636363636363636
+42,2,split_event_tfidf,Split-event Word TF-IDF,LUSC,0.2702702702702703
+42,2,split_event_tfidf,Split-event Word TF-IDF,OV,0.3261802575107296
+42,2,split_event_tfidf,Split-event Word TF-IDF,PAAD,0.08333333333333333
+42,2,split_event_tfidf,Split-event Word TF-IDF,PCPG,0.3448275862068966
+42,2,split_event_tfidf,Split-event Word TF-IDF,PRAD,0.24731182795698925
+42,2,split_event_tfidf,Split-event Word TF-IDF,SARC,0.078125
+42,2,split_event_tfidf,Split-event Word TF-IDF,SKCM,0.5309734513274337
+42,2,split_event_tfidf,Split-event Word TF-IDF,STES,0.3534136546184739
+42,2,split_event_tfidf,Split-event Word TF-IDF,TGCT,0.34615384615384615
+42,2,split_event_tfidf,Split-event Word TF-IDF,THCA,0.5989847715736041
+42,2,split_event_tfidf,Split-event Word TF-IDF,THYM,0.25
+42,2,split_event_tfidf,Split-event Word TF-IDF,UCEC,0.5082872928176796
+42,2,split_event_structural,Split-event Word TF-IDF + structural,ACC,0.8518518518518519
+42,2,split_event_structural,Split-event Word TF-IDF + structural,BLCA,0.26666666666666666
+42,2,split_event_structural,Split-event Word TF-IDF + structural,BRCA,0.5305263157894737
+42,2,split_event_structural,Split-event Word TF-IDF + structural,CESC,0.12345679012345678
+42,2,split_event_structural,Split-event Word TF-IDF + structural,COAD,0.762589928057554
+42,2,split_event_structural,Split-event Word TF-IDF + structural,DLBC,0.17391304347826086
+42,2,split_event_structural,Split-event Word TF-IDF + structural,GBMLGG,0.33210332103321033
+42,2,split_event_structural,Split-event Word TF-IDF + structural,HNSC,0.3333333333333333
+42,2,split_event_structural,Split-event Word TF-IDF + structural,KIPAN,0.23493975903614459
+42,2,split_event_structural,Split-event Word TF-IDF + structural,KIRC,0.12037037037037036
+42,2,split_event_structural,Split-event Word TF-IDF + structural,LAML,0.5210084033613446
+42,2,split_event_structural,Split-event Word TF-IDF + structural,LGG,0.3373493975903614
+42,2,split_event_structural,Split-event Word TF-IDF + structural,LIHC,0.24175824175824176
+42,2,split_event_structural,Split-event Word TF-IDF + structural,LUAD,0.24742268041237114
+42,2,split_event_structural,Split-event Word TF-IDF + structural,LUSC,0.43636363636363634
+42,2,split_event_structural,Split-event Word TF-IDF + structural,OV,0.35944700460829493
+42,2,split_event_structural,Split-event Word TF-IDF + structural,PAAD,0.18181818181818182
+42,2,split_event_structural,Split-event Word TF-IDF + structural,PCPG,0.4098360655737705
+42,2,split_event_structural,Split-event Word TF-IDF + structural,PRAD,0.34782608695652173
+42,2,split_event_structural,Split-event Word TF-IDF + structural,SARC,0.16071428571428573
+42,2,split_event_structural,Split-event Word TF-IDF + structural,SKCM,0.6095238095238096
+42,2,split_event_structural,Split-event Word TF-IDF + structural,STES,0.49206349206349204
+42,2,split_event_structural,Split-event Word TF-IDF + structural,TGCT,0.41509433962264153
+42,2,split_event_structural,Split-event Word TF-IDF + structural,THCA,0.6185567010309279
+42,2,split_event_structural,Split-event Word TF-IDF + structural,THYM,0.2727272727272727
+42,2,split_event_structural,Split-event Word TF-IDF + structural,UCEC,0.5135135135135135
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,ACC,0.8695652173913043
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,BLCA,0.21212121212121213
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,BRCA,0.5476190476190477
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,CESC,0.12121212121212122
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,COAD,0.6103896103896104
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,DLBC,0.3333333333333333
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,GBMLGG,0.23622047244094488
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,HNSC,0.256
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,KIPAN,0.16666666666666666
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,KIRC,0.09009009009009009
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,LAML,0.5882352941176471
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,LGG,0.33707865168539325
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,LIHC,0.1839080459770115
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,LUAD,0.2
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,LUSC,0.2727272727272727
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,OV,0.3211009174311927
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,PAAD,0.19047619047619047
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,PCPG,0.3225806451612903
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,PRAD,0.24
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,SARC,0.15517241379310345
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,SKCM,0.5919282511210763
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,STES,0.3137254901960784
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,TGCT,0.2696629213483146
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,THCA,0.6074766355140186
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,THYM,0.3333333333333333
+42,3,raw_cell_tfidf,Raw-cell Word TF-IDF,UCEC,0.46616541353383456
+42,3,split_event_tfidf,Split-event Word TF-IDF,ACC,0.8163265306122449
+42,3,split_event_tfidf,Split-event Word TF-IDF,BLCA,0.25
+42,3,split_event_tfidf,Split-event Word TF-IDF,BRCA,0.5497076023391813
+42,3,split_event_tfidf,Split-event Word TF-IDF,CESC,0.125
+42,3,split_event_tfidf,Split-event Word TF-IDF,COAD,0.6172839506172839
+42,3,split_event_tfidf,Split-event Word TF-IDF,DLBC,0.5384615384615384
+42,3,split_event_tfidf,Split-event Word TF-IDF,GBMLGG,0.26459143968871596
+42,3,split_event_tfidf,Split-event Word TF-IDF,HNSC,0.1875
+42,3,split_event_tfidf,Split-event Word TF-IDF,KIPAN,0.15384615384615385
+42,3,split_event_tfidf,Split-event Word TF-IDF,KIRC,0.09691629955947137
+42,3,split_event_tfidf,Split-event Word TF-IDF,LAML,0.5882352941176471
+42,3,split_event_tfidf,Split-event Word TF-IDF,LGG,0.32954545454545453
+42,3,split_event_tfidf,Split-event Word TF-IDF,LIHC,0.21739130434782608
+42,3,split_event_tfidf,Split-event Word TF-IDF,LUAD,0.2857142857142857
+42,3,split_event_tfidf,Split-event Word TF-IDF,LUSC,0.25
+42,3,split_event_tfidf,Split-event Word TF-IDF,OV,0.3181818181818182
+42,3,split_event_tfidf,Split-event Word TF-IDF,PAAD,0.15384615384615385
+42,3,split_event_tfidf,Split-event Word TF-IDF,PCPG,0.3333333333333333
+42,3,split_event_tfidf,Split-event Word TF-IDF,PRAD,0.25906735751295334
+42,3,split_event_tfidf,Split-event Word TF-IDF,SARC,0.17391304347826086
+42,3,split_event_tfidf,Split-event Word TF-IDF,SKCM,0.6376811594202898
+42,3,split_event_tfidf,Split-event Word TF-IDF,STES,0.3170731707317073
+42,3,split_event_tfidf,Split-event Word TF-IDF,TGCT,0.26666666666666666
+42,3,split_event_tfidf,Split-event Word TF-IDF,THCA,0.6197183098591549
+42,3,split_event_tfidf,Split-event Word TF-IDF,THYM,0.35294117647058826
+42,3,split_event_tfidf,Split-event Word TF-IDF,UCEC,0.5068493150684932
+42,3,split_event_structural,Split-event Word TF-IDF + structural,ACC,0.9090909090909091
+42,3,split_event_structural,Split-event Word TF-IDF + structural,BLCA,0.26666666666666666
+42,3,split_event_structural,Split-event Word TF-IDF + structural,BRCA,0.5594989561586639
+42,3,split_event_structural,Split-event Word TF-IDF + structural,CESC,0.09523809523809523
+42,3,split_event_structural,Split-event Word TF-IDF + structural,COAD,0.647887323943662
+42,3,split_event_structural,Split-event Word TF-IDF + structural,DLBC,0.6
+42,3,split_event_structural,Split-event Word TF-IDF + structural,GBMLGG,0.2857142857142857
+42,3,split_event_structural,Split-event Word TF-IDF + structural,HNSC,0.22580645161290322
+42,3,split_event_structural,Split-event Word TF-IDF + structural,KIPAN,0.21700879765395895
+42,3,split_event_structural,Split-event Word TF-IDF + structural,KIRC,0.09090909090909091
+42,3,split_event_structural,Split-event Word TF-IDF + structural,LAML,0.5811965811965812
+42,3,split_event_structural,Split-event Word TF-IDF + structural,LGG,0.3314285714285714
+42,3,split_event_structural,Split-event Word TF-IDF + structural,LIHC,0.32323232323232326
+42,3,split_event_structural,Split-event Word TF-IDF + structural,LUAD,0.24444444444444444
+42,3,split_event_structural,Split-event Word TF-IDF + structural,LUSC,0.3780487804878049
+42,3,split_event_structural,Split-event Word TF-IDF + structural,OV,0.3406113537117904
+42,3,split_event_structural,Split-event Word TF-IDF + structural,PAAD,0.17142857142857143
+42,3,split_event_structural,Split-event Word TF-IDF + structural,PCPG,0.3779527559055118
+42,3,split_event_structural,Split-event Word TF-IDF + structural,PRAD,0.3285024154589372
+42,3,split_event_structural,Split-event Word TF-IDF + structural,SARC,0.12631578947368421
+42,3,split_event_structural,Split-event Word TF-IDF + structural,SKCM,0.6547085201793722
+42,3,split_event_structural,Split-event Word TF-IDF + structural,STES,0.3377777777777778
+42,3,split_event_structural,Split-event Word TF-IDF + structural,TGCT,0.44660194174757284
+42,3,split_event_structural,Split-event Word TF-IDF + structural,THCA,0.6699029126213593
+42,3,split_event_structural,Split-event Word TF-IDF + structural,THYM,0.36363636363636365
+42,3,split_event_structural,Split-event Word TF-IDF + structural,UCEC,0.45588235294117646
