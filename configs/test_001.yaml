@@ -28,4 +28,4 @@ training:
   metric: macro_f1
 
 preprocessing:
-  name: em_v1
+  name: jsj_v1

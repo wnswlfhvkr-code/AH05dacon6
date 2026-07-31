@@ -20,17 +20,12 @@ def test_new_models_and_pipeline_are_registered() -> None:
     assert "jsj_v1" in PIPELINES
 
 
-def test_model_configs_reference_registered_components() -> None:
+def test_shared_test_config_references_registered_components() -> None:
     root = Path(__file__).parents[1]
-    for filename in (
-        "lightgbm.yaml",
-        "linear_svc.yaml",
-        "jsj_wc_tfidf_lsvc_lgbm_v1.yaml",
-    ):
-        with (root / "configs" / filename).open(encoding="utf-8") as file:
-            config = yaml.safe_load(file)
-        assert config["model"]["name"] in MODEL_BUILDERS
-        assert config["preprocessing"]["name"] in PIPELINES
+    with (root / "configs" / "test_001.yaml").open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+    assert config["model"]["name"] in MODEL_BUILDERS
+    assert config["preprocessing"]["name"] in PIPELINES
 
 
 def test_wc_tfidf_pipeline_splits_train_and_transform_without_refitting() -> None:

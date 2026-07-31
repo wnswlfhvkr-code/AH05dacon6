@@ -27,12 +27,12 @@ def test_baseline_pipeline_has_descriptive_filename() -> None:
     assert not (root / "src" / "pipelines" / "v1.py").exists()
 
 
-def test_test_001_config_uses_em_v1_pipeline() -> None:
+def test_test_001_config_uses_jsj_v1_pipeline() -> None:
     root = Path(__file__).parents[1]
     config_path = root / "configs" / "test_001.yaml"
 
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert (root / "src" / "pipelines" / "pipeline_em_v1.py").is_file()
-    assert config["preprocessing"]["name"] == "em_v1"
+    assert (root / "src" / "pipelines" / "pipeline_jsj_v1.py").is_file()
+    assert config["preprocessing"]["name"] == "jsj_v1"

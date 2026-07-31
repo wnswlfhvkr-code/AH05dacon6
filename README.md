@@ -32,18 +32,19 @@ python -m src.train --config configs/baseline.yaml
 
 검증 Macro F1은 화면과 `data/processed/baseline_metrics.json`에 기록되며, 제출 파일은 `data/processed/baseline_submission.csv`에 생성됩니다.
 
-새 모델은 `src/models/`에 생성 함수를 추가하고, `src/models/__init__.py`의 `MODEL_BUILDERS`에 등록한 뒤 `configs/`에 해당 모델의 설정 파일을 추가합니다.
+새 모델은 `src/models/`에 생성 함수를 추가하고
+`src/models/__init__.py`의 `MODEL_BUILDERS`에 등록합니다. 실험 설정은
+새 YAML을 추가하지 않고 `configs/test_001.yaml`에서 변경합니다.
 
 현재 등록된 모델은 `xgboost`, `lightgbm`, `linear_svc`,
-`wc_tfidf_lsvc_lgbm`입니다. 개별 실행 예시는 다음과 같습니다.
+`wc_tfidf_lsvc_lgbm`입니다. `test_001.yaml`의 `model.name`과
+하이퍼파라미터를 바꾼 뒤 공통 명령으로 실행합니다.
 
 ```bash
-python -m src.train --config configs/lightgbm.yaml
-python -m src.train --config configs/linear_svc.yaml
-python -m src.train --config configs/jsj_wc_tfidf_lsvc_lgbm_v1.yaml
+python -m src.train --config configs/test_001.yaml
 ```
 
-`jsj_wc_tfidf_lsvc_lgbm_v1`은 기존 Public 0.3714981583 제출의 핵심 구성인
+`wc_tfidf_lsvc_lgbm`은 기존 Public 0.3714981583 제출의 핵심 구성인
 Word+Char TF-IDF, LinearSVC 95%, 트리 모델 5%, 클래스 보정을
 협업 저장소에서 다시 학습할 수 있도록 구성한 버전입니다. 기존 제출은
 여러 OOF 산출물을 결합했으므로 새 실행 결과가 기존 제출 파일과 완전히
@@ -57,9 +58,14 @@ python -m src.data_quality --config configs/baseline.yaml
 
 ## 전처리 파이프라인
 
-설정 파일의 `preprocessing.name`에서 전처리 파이프라인을 선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다. 순서 인코더는 학습 데이터에 없는 값을 `-1`로 변환합니다. 새 파이프라인은 `src/pipelines/`에 추가한 뒤 설정 파일의 이름만 바꿔 같은 모델 조건에서 비교합니다.
+`configs/test_001.yaml`의 `preprocessing.name`에서 전처리 파이프라인을
+선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩,
+타깃 레이블 인코딩을 적용합니다. 새 파이프라인은 `src/pipelines/`에
+추가하고 레지스트리에 등록한 뒤, `preprocessing.name`만 바꿔 같은
+모델 조건에서 비교합니다.
 
-사용 가능한 파이프라인은 `baseline`과 `em_v1`입니다. `configs/test_001.yaml`은 `em_v1`을 사용합니다.
+사용 가능한 파이프라인은 `baseline`, `em_v1`, `jsj_v1`입니다.
+현재 `configs/test_001.yaml`은 `jsj_v1`을 사용합니다.
 
 ## 실행 환경
 
