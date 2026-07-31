@@ -13,5 +13,6 @@ def create_model(model_config: dict, seed: int) -> XGBClassifier:
         max_depth=model_config["max_depth"],
         random_state=seed,
         n_jobs=model_config["n_jobs"],
-        eval_metric="mlogloss",
+        eval_metric=model_config.get("eval_metric", "mlogloss"),
+        tree_method=model_config.get("tree_method", "hist"),
     )
