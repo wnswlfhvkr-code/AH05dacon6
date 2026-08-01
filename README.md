@@ -63,8 +63,21 @@ python -m src.data_quality --config configs/baseline.yaml
 추가하고 레지스트리에 등록한 뒤, `preprocessing.name`만 바꿔 같은
 모델 조건에서 비교합니다.
 
-사용 가능한 파이프라인은 `baseline`, `em_v1`, `jsj_v1`, `jsj_v2`입니다.
+사용 가능한 파이프라인은 `baseline`, `em_v1`, `jsj_v1`~`jsj_v6`입니다.
 현재 `configs/test_004.yaml`은 XGBoost용 압축 구조 피처인 `jsj_v2`를 사용합니다.
+
+## TEST_004 제출 재현
+
+정세준의 제출 4건은 `configs/test_004_1.yaml`부터
+`configs/test_004_4.yaml`까지 분리되어 있습니다.
+
+```bash
+python -m src.reproduce_test_004 --config configs/test_004_4.yaml
+```
+
+모델 사양은 `src/models/baseline/TEST_004_n.py`, 전처리는
+`src/pipelines/pipeline_jsj_v3.py`부터 `pipeline_jsj_v6.py`에서 확인합니다.
+전체 실행 매핑은 `docs/test-004-reproduction.md`에 정리되어 있습니다.
 
 ## 실행 환경
 

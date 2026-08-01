@@ -32,10 +32,8 @@ def _mutation_type(value: str) -> str:
         return "INS"
     if "dup" in lowered:
         return "DUP"
-    if "*" in value or "stop" in lowered or value.endswith("X"):
+    if "*" in value or "stop" in lowered:
         return "STOP"
-    if re.fullmatch(r"[A-Za-z*]+\d+[A-Za-z*]+", value):
-        return "SUB"
     if ">" in value:
         return "SUB"
     return "OTHER"

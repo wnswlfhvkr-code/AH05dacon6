@@ -4,12 +4,20 @@ from src.pipelines.pipeline_baseline import BaselinePreprocessingPipeline
 from src.pipelines.pipeline_em_v1 import EMV1PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v1 import JSJV1PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v2 import JSJV2PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v3 import JSJV3PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v4 import JSJV4PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v5 import JSJV5PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v6 import JSJV6PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
     "em_v1": EMV1PreprocessingPipeline,
     "jsj_v1": JSJV1PreprocessingPipeline,
     "jsj_v2": JSJV2PreprocessingPipeline,
+    "jsj_v3": JSJV3PreprocessingPipeline,
+    "jsj_v4": JSJV4PreprocessingPipeline,
+    "jsj_v5": JSJV5PreprocessingPipeline,
+    "jsj_v6": JSJV6PreprocessingPipeline,
 }
 
 
