@@ -12,6 +12,7 @@ EXPECTED = {
     2: ("TEST_004_2", "jsj_v4", 0.3741003172),
     3: ("TEST_004_3", "jsj_v5", 0.3756133965),
     4: ("TEST_004_4", "jsj_v6", 0.3768261636),
+    5: ("TEST_004_5", "jsj_v7", 0.3863356794),
 }
 
 
@@ -43,6 +44,13 @@ def test_pipeline_strategy_matches_model_spec() -> None:
             "KIRC_KIPAN": spec["postprocessing"]["KIRC_KIPAN"],
             "LGG_GBMLGG": spec["postprocessing"]["LGG_GBMLGG"],
         }
+        if number == 5:
+            assert pipeline.conflict_specialist_c == spec["postprocessing"][
+                "specialist_c"
+            ]
+            assert pipeline.conflict_right_offset == spec["postprocessing"][
+                "right_offset"
+            ]
 
 
 def test_historical_text_token_classification_is_preserved() -> None:

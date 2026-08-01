@@ -119,6 +119,16 @@ def validate_pipeline_strategy(pipeline, spec):
         for key in ("KIRC_KIPAN", "LGG_GBMLGG")
     }:
         raise ValueError("pipeline의 충돌 보정 가중치와 model spec이 일치하지 않습니다.")
+    expected_c = spec["postprocessing"].get(
+        "specialist_c", {key: 0.2 for key in ("KIRC_KIPAN", "LGG_GBMLGG")}
+    )
+    expected_offset = spec["postprocessing"].get(
+        "right_offset", {key: 0.0 for key in ("KIRC_KIPAN", "LGG_GBMLGG")}
+    )
+    if getattr(pipeline, "conflict_specialist_c", expected_c) != expected_c:
+        raise ValueError("pipeline의 충돌 전문 모델 C가 model spec과 일치하지 않습니다.")
+    if getattr(pipeline, "conflict_right_offset", expected_offset) != expected_offset:
+        raise ValueError("pipeline의 충돌 보정 offset이 model spec과 일치하지 않습니다.")
 
 
 def main():
@@ -311,15 +321,23 @@ def main():
         fold_y = y[train_index]
         for pair_name, (left, right) in pair_indices.items():
             pair_mask = (fold_y == left) | (fold_y == right)
-            specialist = LinearSVC(C=0.2, class_weight="balanced", random_state=42)
+            specialist_c = spec["postprocessing"].get(
+                "specialist_c", {}
+            ).get(pair_name, 0.2)
+            right_offset = spec["postprocessing"].get(
+                "right_offset", {}
+            ).get(pair_name, 0.0)
+            specialist = LinearSVC(
+                C=specialist_c, class_weight="balanced", random_state=42
+            )
             specialist.fit(
                 train_bundle.text[pair_mask], (fold_y[pair_mask] == right).astype(int)
             )
             specialist_oof[pair_name][valid_index] = expit(
-                specialist.decision_function(valid_bundle.text)
+                specialist.decision_function(valid_bundle.text) - right_offset
             )
             specialist_test[pair_name] += expit(
-                specialist.decision_function(test_bundle.text)
+                specialist.decision_function(test_bundle.text) - right_offset
             ) / n_splits
 
         del (

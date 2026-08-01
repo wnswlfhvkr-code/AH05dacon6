@@ -8,6 +8,7 @@ from src.pipelines.pipeline_jsj_v3 import JSJV3PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v4 import JSJV4PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v5 import JSJV5PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v6 import JSJV6PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v7 import JSJV7PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -18,6 +19,7 @@ PIPELINES = {
     "jsj_v4": JSJV4PreprocessingPipeline,
     "jsj_v5": JSJV5PreprocessingPipeline,
     "jsj_v6": JSJV6PreprocessingPipeline,
+    "jsj_v7": JSJV7PreprocessingPipeline,
 }
 
 

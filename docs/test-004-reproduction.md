@@ -1,4 +1,4 @@
-# TEST_004 제출 4건 재현 가이드
+# TEST_004 제출 5건 재현 가이드
 
 ## 공통 준비
 
@@ -18,12 +18,14 @@ python -m pip install -r requirements.txt
 | TEST_004_2 | `configs/test_004_2.yaml` | `src/models/baseline/TEST_004_2.py` | `src/pipelines/pipeline_jsj_v4.py` | 0.507241 | 0.374100 |
 | TEST_004_3 | `configs/test_004_3.yaml` | `src/models/baseline/TEST_004_3.py` | `src/pipelines/pipeline_jsj_v5.py` | 0.508134 | 0.375613 |
 | TEST_004_4 | `configs/test_004_4.yaml` | `src/models/baseline/TEST_004_4.py` | `src/pipelines/pipeline_jsj_v6.py` | 0.508400 | 0.376826 |
+| TEST_004_5 | `configs/test_004_5.yaml` | `src/models/baseline/TEST_004_5.py` | `src/pipelines/pipeline_jsj_v7.py` | 0.514965 | 0.386336 |
 
 ```bash
 python -m src.reproduce_test_004 --config configs/test_004_1.yaml
 python -m src.reproduce_test_004 --config configs/test_004_2.yaml
 python -m src.reproduce_test_004 --config configs/test_004_3.yaml
 python -m src.reproduce_test_004 --config configs/test_004_4.yaml
+python -m src.reproduce_test_004 --config configs/test_004_5.yaml
 ```
 
 생성 결과는 각각 다음 위치에 저장됩니다.
@@ -37,6 +39,7 @@ python -m src.reproduce_test_004 --config configs/test_004_4.yaml
 - `TEST_004_2`: KIRC–KIPAN, LGG–GBMLGG 확률을 전문 이진 LinearSVC로 전면 보정합니다.
 - `TEST_004_3`: 전문 모델의 결과가 반드시 해당 충돌 쌍 내부에서만 바뀌도록 제한합니다.
 - `TEST_004_4`: LGG–GBMLGG는 100%, KIRC–KIPAN은 10%만 보정합니다.
+- `TEST_004_5`: LGG–GBMLGG 전문 모델의 C를 0.10으로 낮추고 GBMLGG 방향 결정값에 0.10 오프셋을 적용합니다.
 
 ## 재현 범위
 
