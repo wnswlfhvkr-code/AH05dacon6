@@ -22,7 +22,6 @@ def infer_numeric_columns(features: pd.DataFrame, minimum_valid_ratio: float = 0
 
 class PreprocessingPipeline:
     """상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다."""
-    print(f"[pipeline_base]:{'>'*50}")
     def __init__(self, **_: object) -> None:
         self.steps = ("상수 열 제거", "범주형 순서 인코딩")
         self.feature_columns: list[str] = []
@@ -68,4 +67,3 @@ class PreprocessingPipeline:
 
     def decode_labels(self, labels):
         return self.label_encoder.inverse_transform(labels.astype(int))
-
