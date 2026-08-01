@@ -44,7 +44,7 @@ python -m src.data_quality --config configs/baseline.yaml
 
 설정 파일의 `preprocessing.name`에서 전처리 파이프라인을 선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다. 순서 인코더는 학습 데이터에 없는 값을 `-1`로 변환합니다. 새 파이프라인은 `src/pipelines/`에 추가한 뒤 설정 파일의 이름만 바꿔 같은 모델 조건에서 비교합니다.
 
-사용 가능한 파이프라인은 `baseline`과 `em_v1`입니다. `configs/test_001.yaml`은 `em_v1`을 사용합니다.
+연구 파이프라인은 `em_v4`부터 `em_v14`까지 등록되어 있습니다. `em_v14`는 `em_v12`의 기능 결과·암종 signature에 학습 Fold에서 반복 관측된 hotspot 변이를 추가하며, `configs/test_001.yaml`에서 사용합니다.
 
 ## 실행 환경
 

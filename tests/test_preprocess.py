@@ -36,13 +36,6 @@ def test_pipeline_factory_creates_baseline() -> None:
     assert pipeline.steps == ("상수 열 제거", "범주형 순서 인코딩")
 
 
-def test_pipeline_factory_creates_em_v1() -> None:
-    pipeline = create_preprocessing_pipeline({"name": "em_v1"})
-
-    assert pipeline.name == "em_v1"
-    assert pipeline.steps == ("상수 열 제거", "범주형 순서 인코딩")
-
-
 def test_xgboost_accepts_ordinal_encoded_features() -> None:
     features = pd.DataFrame({
         "gene_a": ["WT", "M1", "WT", "M2", "WT", "M1", "WT", "M2"],
