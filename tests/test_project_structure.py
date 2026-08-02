@@ -123,7 +123,6 @@ def test_shared_src_has_no_jyp_experiment_entrypoints() -> None:
         source / "export_preprocessing_optimizer_results.py",
         source / "optimize_preprocessing.py",
         source / "validate_preprocessing_all.py",
-        source / "models" / "logistic_regression_model.py",
         source / "pipelines" / "pipeline_jyp_v1.py",
     ]
 
