@@ -15,6 +15,8 @@ from src.pipelines.pipeline_em_v11 import EMV11PreprocessingPipeline
 from src.pipelines.pipeline_em_v12 import EMV12PreprocessingPipeline
 from src.pipelines.pipeline_em_v13 import EMV13PreprocessingPipeline
 from src.pipelines.pipeline_em_v14 import EMV14PreprocessingPipeline
+from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
+
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -32,6 +34,7 @@ PIPELINES = {
     "em_v12": EMV12PreprocessingPipeline,
     "em_v13": EMV13PreprocessingPipeline,
     "em_v14": EMV14PreprocessingPipeline,
+    "jh_v01": JHV01PreprocessingPipeline,
 }
 
 
