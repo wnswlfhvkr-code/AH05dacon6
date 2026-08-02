@@ -28,4 +28,11 @@ training:
   metric: macro_f1
 
 preprocessing:
-  name: em_v1
+  name: em_v4
+  min_mutation_count: 5
+  top_genes_per_class: 20
+  smoothing: 0.5
+  max_log2_odds: 8.0
+  shrinkage: 10.0
+  min_hotspot_count: 5
+  max_hotspots: 384

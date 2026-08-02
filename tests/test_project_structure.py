@@ -1,6 +1,13 @@
 from pathlib import Path
 
+import pytest
 import yaml
+
+from src.pipelines.preprocessing_registry import PIPELINES
+
+
+ROOT = Path(__file__).parents[1]
+CONFIG_PATHS = sorted((ROOT / "configs").rglob("*.yaml"))
 
 
 def test_baseline_config_matches_notebook_parameters() -> None:
@@ -20,31 +27,26 @@ def test_baseline_config_matches_notebook_parameters() -> None:
     assert config["preprocessing"]["name"] == "baseline"
 
 
-def test_baseline_pipeline_has_descriptive_filename() -> None:
-    root = Path(__file__).parents[1]
-
-    assert (root / "src" / "pipelines" / "pipeline_baseline.py").is_file()
-    assert not (root / "src" / "pipelines" / "v1.py").exists()
-
-
-def test_test_001_config_uses_em_v1_pipeline() -> None:
-    root = Path(__file__).parents[1]
-    config_path = root / "configs" / "test_001.yaml"
-
+@pytest.mark.parametrize(
+    "config_path",
+    CONFIG_PATHS,
+    ids=lambda path: str(path.relative_to(ROOT / "configs")),
+)
+def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert (root / "src" / "pipelines" / "pipeline_em_v1.py").is_file()
-    assert config["preprocessing"]["name"] == "em_v1"
+    pipeline_name = config["preprocessing"]["name"]
+    assert pipeline_name in PIPELINES
+    assert (ROOT / "src" / "pipelines" / f"pipeline_{pipeline_name}.py").is_file()
 
 
 def test_test_004_config_uses_jsj_v2_pipeline() -> None:
-    root = Path(__file__).parents[1]
-    config_path = root / "configs" / "test_004.yaml"
+    config_path = ROOT / "configs" / "test_004.yaml"
 
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert (root / "src" / "pipelines" / "pipeline_jsj_v2.py").is_file()
+    assert (ROOT / "src" / "pipelines" / "pipeline_jsj_v2.py").is_file()
     assert config["project"]["experiment_name"] == "test_004"
     assert config["preprocessing"]["name"] == "jsj_v2"

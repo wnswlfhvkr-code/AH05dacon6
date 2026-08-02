@@ -2,6 +2,19 @@
 
 from src.pipelines.pipeline_baseline import BaselinePreprocessingPipeline
 from src.pipelines.pipeline_em_v1 import EMV1PreprocessingPipeline
+from src.pipelines.pipeline_em_v2 import EMV2PreprocessingPipeline
+from src.pipelines.pipeline_em_v3 import EMV3PreprocessingPipeline
+from src.pipelines.pipeline_em_v4 import EMV4PreprocessingPipeline
+from src.pipelines.pipeline_em_v5 import EMV5PreprocessingPipeline
+from src.pipelines.pipeline_em_v6 import EMV6PreprocessingPipeline
+from src.pipelines.pipeline_em_v7 import EMV7PreprocessingPipeline
+from src.pipelines.pipeline_em_v8 import EMV8PreprocessingPipeline
+from src.pipelines.pipeline_em_v9 import EMV9PreprocessingPipeline
+from src.pipelines.pipeline_em_v10 import EMV10PreprocessingPipeline
+from src.pipelines.pipeline_em_v11 import EMV11PreprocessingPipeline
+from src.pipelines.pipeline_em_v12 import EMV12PreprocessingPipeline
+from src.pipelines.pipeline_em_v13 import EMV13PreprocessingPipeline
+from src.pipelines.pipeline_em_v14 import EMV14PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v1 import JSJV1PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v2 import JSJV2PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v3 import JSJV3PreprocessingPipeline
@@ -13,6 +26,19 @@ from src.pipelines.pipeline_jsj_v7 import JSJV7PreprocessingPipeline
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
     "em_v1": EMV1PreprocessingPipeline,
+    "em_v2": EMV2PreprocessingPipeline,
+    "em_v3": EMV3PreprocessingPipeline,
+    "em_v4": EMV4PreprocessingPipeline,
+    "em_v5": EMV5PreprocessingPipeline,
+    "em_v6": EMV6PreprocessingPipeline,
+    "em_v7": EMV7PreprocessingPipeline,
+    "em_v8": EMV8PreprocessingPipeline,
+    "em_v9": EMV9PreprocessingPipeline,
+    "em_v10": EMV10PreprocessingPipeline,
+    "em_v11": EMV11PreprocessingPipeline,
+    "em_v12": EMV12PreprocessingPipeline,
+    "em_v13": EMV13PreprocessingPipeline,
+    "em_v14": EMV14PreprocessingPipeline,
     "jsj_v1": JSJV1PreprocessingPipeline,
     "jsj_v2": JSJV2PreprocessingPipeline,
     "jsj_v3": JSJV3PreprocessingPipeline,

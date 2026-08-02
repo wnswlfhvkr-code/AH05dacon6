@@ -63,8 +63,11 @@ python -m src.data_quality --config configs/baseline.yaml
 추가하고 레지스트리에 등록한 뒤, `preprocessing.name`만 바꿔 같은
 모델 조건에서 비교합니다.
 
-사용 가능한 파이프라인은 `baseline`, `em_v1`, `jsj_v1`~`jsj_v7`입니다.
+사용 가능한 파이프라인은 `baseline`, `em_v1`~`em_v14`, `jsj_v1`~`jsj_v7`입니다.
 현재 `configs/test_004.yaml`은 XGBoost용 압축 구조 피처인 `jsj_v2`를 사용합니다.
+
+`em_v14`는 기능 결과·암종 signature에 학습 Fold에서 반복 관측된 hotspot
+변이를 추가합니다. `configs/test_001.yaml`에서 선택할 수 있습니다.
 
 ## TEST_004 제출 재현
 
