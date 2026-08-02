@@ -209,8 +209,8 @@ def main() -> None:
     if preprocessing_cv:
         effective_config["preprocessing_cv"] = preprocessing_cv
 
-    validation_preprocessor = create_preprocessing_pipeline(preprocessing_config).fit(train_features, train_labels)
-    train_x = validation_preprocessor.transform(train_features)
+    validation_preprocessor = create_preprocessing_pipeline(preprocessing_config)
+    train_x = validation_preprocessor.fit_transform(train_features, train_labels)
     valid_x = validation_preprocessor.transform(valid_features)
     train_y = validation_preprocessor.encode_labels(train_labels)
     valid_y = validation_preprocessor.encode_labels(valid_labels)

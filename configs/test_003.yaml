@@ -1,0 +1,48 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_003_f7_2
+  seed: 42
+  python_version: "3.14"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: xgboost
+  n_estimators: 100
+  learning_rate: 0.1
+  max_depth: 6
+  n_jobs: -1
+  eval_metric: mlogloss
+  tree_method: hist
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+
+preprocessing:
+  name: jyp_f7
+  burden_clip_quantile: 0.99
+  f3_position_min_support: 3
+  f3_aa_min_support: 3
+  f4_min_support: 5
+  f7_pairs:
+    - [KIRC, KIPAN]
+    - [LGG, GBMLGG]
+  f7_top_k_per_direction: 3
+  f7_min_gene_support: 10
+  f7_laplace_alpha: 4.0
+  f7_burden_quantiles: 5
+  f7_stability_folds: 5
+  f7_min_direction_consistency: 4
+  f7_min_selection_frequency: 3
+  f7_random_state: 42
+  show_progress: true
+  progress_interval: 25000
