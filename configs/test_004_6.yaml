@@ -1,0 +1,62 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_004_6
+  author: 정세준
+  seed: 42
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  spec: TEST_004_6
+  n_splits: 5
+  linear_c: 0.2
+  temperature: 0.5
+  linear_weight: 0.95
+  base_tree_weight: 0.025
+  e1_tree_weight: 0.025
+
+preprocessing:
+  name: jsj_v8
+  word_ngram_range: [1, 2]
+  word_min_df: 2
+  word_max_features: 250000
+  char_ngram_range: [3, 5]
+  char_min_df: 3
+  char_max_features: 180000
+  char_weight: 0.5
+
+auxiliary_preprocessing:
+  name: em_v14
+  min_mutation_count: 5
+  top_genes_per_class: 20
+  smoothing: 0.5
+  max_log2_odds: 8.0
+  shrinkage: 10.0
+  min_hotspot_count: 5
+  max_hotspots: 384
+
+auxiliary_model:
+  n_estimators: 120
+  learning_rate: 0.05
+  num_leaves: 15
+  min_child_samples: 18
+  subsample: 0.85
+  subsample_freq: 1
+  colsample_bytree: 0.80
+  reg_alpha: 0.15
+  reg_lambda: 0.50
+  early_stopping_rounds: 30
+
+record:
+  submitted: true
+  submission_date: 2026-08-02
+  historical_public_macro_f1: 0.3893423841
+  historical_oof_macro_f1: 0.5188229895662899
+  original_submission: submission_jsj_em14_kirc_v1.csv

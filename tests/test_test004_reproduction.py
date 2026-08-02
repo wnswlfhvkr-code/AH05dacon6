@@ -13,6 +13,7 @@ EXPECTED = {
     3: ("TEST_004_3", "jsj_v5", 0.3756133965),
     4: ("TEST_004_4", "jsj_v6", 0.3768261636),
     5: ("TEST_004_5", "jsj_v7", 0.3863356794),
+    6: ("TEST_004_6", "jsj_v8", 0.3893423841),
 }
 
 
@@ -44,12 +45,16 @@ def test_pipeline_strategy_matches_model_spec() -> None:
             "KIRC_KIPAN": spec["postprocessing"]["KIRC_KIPAN"],
             "LGG_GBMLGG": spec["postprocessing"]["LGG_GBMLGG"],
         }
-        if number == 5:
+        if number in {5, 6}:
             assert pipeline.conflict_specialist_c == spec["postprocessing"][
                 "specialist_c"
             ]
             assert pipeline.conflict_right_offset == spec["postprocessing"][
                 "right_offset"
+            ]
+        if number == 6:
+            assert pipeline.auxiliary_specialist == spec["postprocessing"][
+                "auxiliary"
             ]
 
 

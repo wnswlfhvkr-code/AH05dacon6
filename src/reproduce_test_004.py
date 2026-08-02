@@ -65,6 +65,29 @@ def make_tree_model(seed: int, e1: bool, quick: bool):
     )
 
 
+def make_auxiliary_model(model_config: dict, seed: int, quick: bool):
+    try:
+        from lightgbm import LGBMClassifier
+    except ImportError as error:
+        raise ImportError("`pip install -r requirements.txt`를 먼저 실행하세요.") from error
+    return LGBMClassifier(
+        objective="multiclass",
+        n_estimators=20 if quick else model_config["n_estimators"],
+        learning_rate=model_config["learning_rate"],
+        num_leaves=model_config["num_leaves"],
+        min_child_samples=model_config["min_child_samples"],
+        subsample=model_config["subsample"],
+        subsample_freq=model_config["subsample_freq"],
+        colsample_bytree=model_config["colsample_bytree"],
+        reg_alpha=model_config["reg_alpha"],
+        reg_lambda=model_config["reg_lambda"],
+        class_weight="balanced",
+        random_state=seed,
+        n_jobs=-1,
+        verbosity=-1,
+    )
+
+
 def balanced_sample_weights(labels):
     unique_labels, counts = np.unique(labels, return_counts=True)
     mapping = {
@@ -82,26 +105,45 @@ def dataset_signature(train: pd.DataFrame, test: pd.DataFrame, genes: list[str])
     return digest.hexdigest()
 
 
-def redistribute(scores, pair_probabilities, pair_indices, strategy):
+def redistribute(
+    scores,
+    pair_probabilities,
+    pair_indices,
+    strategy,
+    auxiliary_pair_probabilities=None,
+):
     mode = strategy["mode"]
     if mode == "none":
         return scores.argmax(axis=1)
     adjusted = scores.copy()
     initial_top = scores.argmax(axis=1)
     strict_prediction = initial_top.copy()
+    auxiliary_pair_probabilities = auxiliary_pair_probabilities or {}
+    auxiliary = strategy.get("auxiliary")
     for pair_name, (left, right) in pair_indices.items():
         weight = float(strategy[pair_name])
-        if weight <= 0:
+        auxiliary_weight = (
+            float(auxiliary["weight"])
+            if auxiliary and auxiliary["pair"] == pair_name
+            else 0.0
+        )
+        if weight <= 0 and auxiliary_weight <= 0:
             continue
+        if weight + auxiliary_weight > 1.0:
+            raise ValueError("충돌 전문가 가중치의 합은 1 이하여야 합니다.")
         active = (initial_top == left) | (initial_top == right)
         if not np.any(active):
             continue
         pair_total = scores[active, left] + scores[active, right]
         base_right = scores[active, right] / np.maximum(pair_total, 1e-12)
         right_share = (
-            (1.0 - weight) * base_right
+            (1.0 - weight - auxiliary_weight) * base_right
             + weight * pair_probabilities[pair_name][active]
         )
+        if auxiliary_weight > 0:
+            right_share += (
+                auxiliary_weight * auxiliary_pair_probabilities[pair_name][active]
+            )
         adjusted[active, left] = pair_total * (1.0 - right_share)
         adjusted[active, right] = pair_total * right_share
         if mode == "strict":
@@ -129,6 +171,9 @@ def validate_pipeline_strategy(pipeline, spec):
         raise ValueError("pipeline의 충돌 전문 모델 C가 model spec과 일치하지 않습니다.")
     if getattr(pipeline, "conflict_right_offset", expected_offset) != expected_offset:
         raise ValueError("pipeline의 충돌 보정 offset이 model spec과 일치하지 않습니다.")
+    expected_auxiliary = spec["postprocessing"].get("auxiliary")
+    if getattr(pipeline, "auxiliary_specialist", expected_auxiliary) != expected_auxiliary:
+        raise ValueError("pipeline의 보조 전문가 설정이 model spec과 일치하지 않습니다.")
 
 
 def main():
@@ -192,6 +237,9 @@ def main():
     specialist_test = {
         pair_name: np.zeros(len(test), dtype=np.float32) for pair_name in pair_indices
     }
+    auxiliary = spec["postprocessing"].get("auxiliary")
+    auxiliary_oof = np.zeros((len(train), n_classes), dtype=np.float32)
+    auxiliary_test = np.zeros((len(test), n_classes), dtype=np.float32)
 
     signature = dataset_signature(train, test, genes)
     cache_path = output_dir / "test_004_tree_probabilities.npz"
@@ -294,6 +342,34 @@ def main():
         del tree_base, tree_base_test, tree_e1, tree_e1_test
         gc.collect()
 
+    auxiliary_cache_valid = False
+    auxiliary_cache_path = output_dir / "test_004_em_v14_probabilities.npz"
+    auxiliary_cache_meta_path = output_dir / "test_004_em_v14_probabilities.json"
+    if (
+        auxiliary
+        and not args.quick
+        and auxiliary_cache_path.exists()
+        and auxiliary_cache_meta_path.exists()
+    ):
+        auxiliary_cache_meta = json.loads(
+            auxiliary_cache_meta_path.read_text(encoding="utf-8")
+        )
+        auxiliary_cache_valid = (
+            auxiliary_cache_meta.get("dataset_signature") == signature
+            and auxiliary_cache_meta.get("classes") == classes.tolist()
+            and auxiliary_cache_meta.get("n_splits") == n_splits
+            and auxiliary_cache_meta.get("pipeline")
+            == config["auxiliary_preprocessing"]
+            and auxiliary_cache_meta.get("model") == config["auxiliary_model"]
+        )
+    if args.refresh_cache:
+        auxiliary_cache_valid = False
+    if auxiliary_cache_valid and not args.refresh_cache:
+        auxiliary_cache = np.load(auxiliary_cache_path)
+        auxiliary_oof[:] = auxiliary_cache["oof"]
+        auxiliary_test[:] = auxiliary_cache["test"]
+        print("EM v14 보조 전문가 OOF 캐시를 불러왔습니다.", flush=True)
+
     for fold, (train_index, valid_index) in enumerate(
         splitter.split(np.zeros(len(y)), y), 1
     ):
@@ -340,6 +416,50 @@ def main():
                 specialist.decision_function(test_bundle.text) - right_offset
             ) / n_splits
 
+        if auxiliary and not auxiliary_cache_valid:
+            from lightgbm import early_stopping, log_evaluation
+
+            auxiliary_pipeline = create_preprocessing_pipeline(
+                dict(config["auxiliary_preprocessing"])
+            )
+            auxiliary_train = auxiliary_pipeline.fit_transform(
+                features.iloc[train_index], train[target].iloc[train_index]
+            )
+            auxiliary_valid = auxiliary_pipeline.transform(features.iloc[valid_index])
+            auxiliary_test_features = auxiliary_pipeline.transform(test_features)
+            auxiliary_model = make_auxiliary_model(
+                config["auxiliary_model"], config["project"]["seed"], args.quick
+            )
+            auxiliary_fit_kwargs = {}
+            if not args.quick:
+                auxiliary_fit_kwargs = {
+                    "eval_set": [(auxiliary_valid, y[valid_index])],
+                    "eval_metric": "multi_logloss",
+                    "callbacks": [
+                        early_stopping(
+                            config["auxiliary_model"]["early_stopping_rounds"],
+                            verbose=False,
+                        ),
+                        log_evaluation(0),
+                    ],
+                }
+            auxiliary_model.fit(
+                auxiliary_train, y[train_index], **auxiliary_fit_kwargs
+            )
+            auxiliary_oof[valid_index] = auxiliary_model.predict_proba(
+                auxiliary_valid
+            )
+            auxiliary_test += (
+                auxiliary_model.predict_proba(auxiliary_test_features) / n_splits
+            )
+            del (
+                auxiliary_pipeline,
+                auxiliary_train,
+                auxiliary_valid,
+                auxiliary_test_features,
+                auxiliary_model,
+            )
+
         del (
             pipeline,
             train_bundle,
@@ -348,6 +468,27 @@ def main():
             svm,
         )
         gc.collect()
+
+    if auxiliary and not args.quick and not auxiliary_cache_valid:
+        np.savez_compressed(
+            auxiliary_cache_path,
+            oof=auxiliary_oof,
+            test=auxiliary_test,
+        )
+        auxiliary_cache_meta_path.write_text(
+            json.dumps(
+                {
+                    "dataset_signature": signature,
+                    "classes": classes.tolist(),
+                    "n_splits": n_splits,
+                    "pipeline": config["auxiliary_preprocessing"],
+                    "model": config["auxiliary_model"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
     svm_oof = softmax(svm_oof_scores / spec["temperature"], axis=1)
     svm_test = softmax(svm_test_scores / spec["temperature"], axis=1)
@@ -364,11 +505,35 @@ def main():
     multipliers = np.asarray(spec["class_multipliers"], dtype=np.float64)
     corrected_oof = base_oof * multipliers
     corrected_test = base_test * multipliers
+    auxiliary_pair_oof = {}
+    auxiliary_pair_test = {}
+    if auxiliary:
+        pair_name = auxiliary["pair"]
+        left, right = pair_indices[pair_name]
+
+        def auxiliary_right_probability(probabilities):
+            left_probability = np.clip(probabilities[:, left], 1e-12, 1.0)
+            right_probability = np.clip(probabilities[:, right], 1e-12, 1.0)
+            decision = (
+                np.log(right_probability) - np.log(left_probability)
+            ) / auxiliary["temperature"] - auxiliary["right_offset"]
+            return expit(decision)
+
+        auxiliary_pair_oof[pair_name] = auxiliary_right_probability(auxiliary_oof)
+        auxiliary_pair_test[pair_name] = auxiliary_right_probability(auxiliary_test)
     oof_prediction = redistribute(
-        corrected_oof, specialist_oof, pair_indices, spec["postprocessing"]
+        corrected_oof,
+        specialist_oof,
+        pair_indices,
+        spec["postprocessing"],
+        auxiliary_pair_oof,
     )
     test_prediction = redistribute(
-        corrected_test, specialist_test, pair_indices, spec["postprocessing"]
+        corrected_test,
+        specialist_test,
+        pair_indices,
+        spec["postprocessing"],
+        auxiliary_pair_test,
     )
     fold_scores = [
         f1_score(y[fold_ids == fold], oof_prediction[fold_ids == fold], average="macro")
@@ -389,6 +554,7 @@ def main():
         "fold_macro_f1": [float(score) for score in fold_scores],
         "historical_oof_macro_f1": spec["historical_oof_macro_f1"],
         "historical_public_macro_f1": spec["historical_public_macro_f1"],
+        "auxiliary_specialist": auxiliary,
         "submission": str(submission_path),
         "external_data_used": False,
         "test_used_for_fit": False,
