@@ -63,11 +63,29 @@ python -m src.data_quality --config configs/baseline.yaml
 추가하고 레지스트리에 등록한 뒤, `preprocessing.name`만 바꿔 같은
 모델 조건에서 비교합니다.
 
-사용 가능한 파이프라인은 `baseline`, `em_v1`~`em_v14`, `jsj_v1`~`jsj_v8`입니다.
+기본·EM·JSJ 파이프라인은 `baseline`, `em_v1`~`em_v14`, `jsj_v1`~`jsj_v8`입니다.
 현재 `configs/test_004.yaml`은 XGBoost용 압축 구조 피처인 `jsj_v2`를 사용합니다.
 
 `em_v14`는 기능 결과·암종 signature에 학습 Fold에서 반복 관측된 hotspot
 변이를 추가합니다. `configs/test_001.yaml`에서 선택할 수 있습니다.
+
+### JYP test_003
+
+`configs/test_003.yaml`은 모델 `xgboost`와 전처리
+`jyp_f7`을 사용합니다. JYP 전처리 16개는
+`src/pipelines/jyp_preprocessing/`의 독립 파이프라인 파일로 구성되며,
+설정의 `preprocessing.name`으로 선택합니다.
+
+- `jyp_raw`, `jyp_f0`, `jyp_f0_no_raw`, `jyp_f1`, `jyp_f2`
+- `jyp_f3_position`, `jyp_f3`, `jyp_f3_no_raw`, `jyp_f4`, `jyp_f4_no_raw`
+- `jyp_f5`, `jyp_f5_no_raw`, `jyp_f5_no_raw_missmask`, `jyp_f5_selective_no_raw`
+- `jyp_f6`, `jyp_f7`
+
+별도 실행기 없이 공용 학습 명령을 사용합니다.
+
+```bash
+python -m src.train --config configs/test_003.yaml
+```
 
 ## TEST_004 제출 재현
 
