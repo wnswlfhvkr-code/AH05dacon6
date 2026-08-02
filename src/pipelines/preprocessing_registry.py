@@ -57,6 +57,8 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f7 import (
     F7PairContrastNoRawPreprocessingPipeline,
 )
 from src.pipelines.jyp_preprocessing.pipeline_jyp_raw import RawPreprocessingPipeline
+from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
+
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -98,6 +100,7 @@ PIPELINES = {
     "jyp_f5_selective_no_raw": F5SelectiveNoRawPreprocessingPipeline,
     "jyp_f6": F6NoRawPreprocessingPipeline,
     "jyp_f7": F7PairContrastNoRawPreprocessingPipeline,
+    "jh_v01": JHV01PreprocessingPipeline,
 }
 
 
