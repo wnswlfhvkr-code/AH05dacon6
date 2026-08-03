@@ -36,6 +36,7 @@ from src.pipelines.pipeline_jsj_v5 import JSJV5PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v6 import JSJV6PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v7 import JSJV7PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v8 import JSJV8PreprocessingPipeline
+from src.pipelines.pipeline_jsj_v9 import JSJV9PreprocessingPipeline
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f0 import F0PreprocessingPipeline
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f0_no_raw import (
     F0NoRawPreprocessingPipeline,
@@ -110,6 +111,7 @@ PIPELINES = {
     "jsj_v6": JSJV6PreprocessingPipeline,
     "jsj_v7": JSJV7PreprocessingPipeline,
     "jsj_v8": JSJV8PreprocessingPipeline,
+    "jsj_v9": JSJV9PreprocessingPipeline,
     "jyp_raw": RawPreprocessingPipeline,
     "jyp_f0": F0PreprocessingPipeline,
     "jyp_f0_no_raw": F0NoRawPreprocessingPipeline,

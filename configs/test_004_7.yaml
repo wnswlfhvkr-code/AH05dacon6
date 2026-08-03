@@ -1,0 +1,52 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_004_7
+  author: 정세준
+  seed: 42
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  spec: TEST_004_7
+  base_config: configs/test_004_6.yaml
+  n_splits: 5
+  team_pipelines:
+    em_v16: 0.40
+    em_v24: 0.60
+  xgboost:
+    n_estimators: 500
+    learning_rate: 0.03
+    max_depth: 3
+    min_child_weight: 5.0
+    subsample: 0.75
+    colsample_bytree: 0.60
+    reg_alpha: 0.50
+    reg_lambda: 10.0
+    early_stopping_rounds: 30
+    eval_metric: mlogloss
+    tree_method: hist
+  pair_experts:
+    temperature: 1.75
+    KIRC_KIPAN:
+      right_offset: 0.50
+      weight: 0.35
+    LGG_GBMLGG:
+      right_offset: 0.30
+      weight: 0.30
+
+preprocessing:
+  name: jsj_v9
+
+record:
+  submitted: false
+  historical_oof_macro_f1: 0.528569659777493
+  historical_public_macro_f1: null
+  candidate_submission: TEST_004_7_submission.csv
+  external_data_used: false
