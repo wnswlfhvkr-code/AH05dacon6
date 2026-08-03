@@ -15,6 +15,19 @@ from src.pipelines.pipeline_em_v11 import EMV11PreprocessingPipeline
 from src.pipelines.pipeline_em_v12 import EMV12PreprocessingPipeline
 from src.pipelines.pipeline_em_v13 import EMV13PreprocessingPipeline
 from src.pipelines.pipeline_em_v14 import EMV14PreprocessingPipeline
+from src.pipelines.pipeline_em_v15 import EMV15PreprocessingPipeline
+from src.pipelines.pipeline_em_v16 import EMV16PreprocessingPipeline
+from src.pipelines.pipeline_em_v17 import EMV17PreprocessingPipeline
+from src.pipelines.pipeline_em_v18 import EMV18PreprocessingPipeline
+from src.pipelines.pipeline_em_v19 import EMV19PreprocessingPipeline
+from src.pipelines.pipeline_em_v20 import EMV20PreprocessingPipeline
+from src.pipelines.pipeline_em_v21 import EMV21PreprocessingPipeline
+from src.pipelines.pipeline_em_v22 import EMV22PreprocessingPipeline
+from src.pipelines.pipeline_em_v23 import EMV23PreprocessingPipeline
+from src.pipelines.pipeline_em_v24 import EMV24PreprocessingPipeline
+from src.pipelines.pipeline_em_v25 import EMV25PreprocessingPipeline
+from src.pipelines.pipeline_em_v26 import EMV26PreprocessingPipeline
+from src.pipelines.pipeline_em_v27 import EMV27PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -32,6 +45,19 @@ PIPELINES = {
     "em_v12": EMV12PreprocessingPipeline,
     "em_v13": EMV13PreprocessingPipeline,
     "em_v14": EMV14PreprocessingPipeline,
+    "em_v15": EMV15PreprocessingPipeline,
+    "em_v16": EMV16PreprocessingPipeline,
+    "em_v17": EMV17PreprocessingPipeline,
+    "em_v18": EMV18PreprocessingPipeline,
+    "em_v19": EMV19PreprocessingPipeline,
+    "em_v20": EMV20PreprocessingPipeline,
+    "em_v21": EMV21PreprocessingPipeline,
+    "em_v22": EMV22PreprocessingPipeline,
+    "em_v23": EMV23PreprocessingPipeline,
+    "em_v24": EMV24PreprocessingPipeline,
+    "em_v25": EMV25PreprocessingPipeline,
+    "em_v26": EMV26PreprocessingPipeline,
+    "em_v27": EMV27PreprocessingPipeline,
 }
 
 

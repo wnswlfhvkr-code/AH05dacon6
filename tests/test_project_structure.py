@@ -39,3 +39,25 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     pipeline_name = config["preprocessing"]["name"]
     assert pipeline_name in PIPELINES
     assert (ROOT / "src" / "pipelines" / f"pipeline_{pipeline_name}.py").is_file()
+
+
+def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
+    expected_model = {
+        "n_estimators": 500,
+        "learning_rate": 0.03,
+        "max_depth": 3,
+        "min_child_weight": 5.0,
+        "subsample": 0.75,
+        "colsample_bytree": 0.6,
+        "reg_alpha": 0.5,
+        "reg_lambda": 10.0,
+        "early_stopping_rounds": 30,
+    }
+    with (ROOT / "configs" / "test_005.yaml").open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    assert config["preprocessing"]["name"] == "em_v19"
+    assert {
+        key: config["model"][key]
+        for key in expected_model
+    } == expected_model

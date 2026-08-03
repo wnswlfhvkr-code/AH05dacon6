@@ -44,7 +44,47 @@ python -m src.data_quality --config configs/baseline.yaml
 
 설정 파일의 `preprocessing.name`에서 전처리 파이프라인을 선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다. 순서 인코더는 학습 데이터에 없는 값을 `-1`로 변환합니다. 새 파이프라인은 `src/pipelines/`에 추가한 뒤 설정 파일의 이름만 바꿔 같은 모델 조건에서 비교합니다.
 
-연구 파이프라인은 `em_v4`부터 `em_v14`까지 등록되어 있습니다. `em_v14`는 `em_v12`의 기능 결과·암종 signature에 학습 Fold에서 반복 관측된 hotspot 변이를 추가하며, `configs/test_001.yaml`에서 사용합니다.
+연구 파이프라인은 `em_v1~em_v28`이 등록되어 있습니다. `em_v15`는 5-fold OOF 평가를, `em_v16`은 학습 표본의 자기 정답 영향을 줄이는 inner-fold OOF signature를 적용합니다. `em_v17`은 셀 문자열 분리와 중복 토큰 제거 후 유전자별 mutation count, consequence, recurrent hotspot, multi-hit 피처를 생성합니다. `em_v18`은 동의 변이를 기능 변이 기반 유전자 선택·signature·hotspot에서 분리하며, `em_v19`는 em_v16 E4와 em_v17의 비중복 token 피처를 결합합니다. `em_v20`은 기능 변이 지지도 5/8/10을 fold 내부에서 선택하고 안정 유전자에만 consequence one-hot을 적용합니다. `em_v21`은 고차원 원시 변이와 불안정 hotspot을 축소합니다. `em_v22`는 em_v16에 em_v26의 TCGA study-family coarse signature를, `em_v23`은 em_v16에 em_v27의 관련 study 내부 fine contrast를 중복 없이 결합합니다. `em_v24`는 em_v16의 전체 변이 신호와 em_v18의 기능 변이 신호를 단일 consequence 처리와 OOF 분할 안에서 분리해 결합합니다. `em_v25`는 em_v16의 OOF 암종 signature와 em_v17의 token count·multi-hit·hotspot을 단일 토큰 처리 흐름에서 결합하고 구조적으로 중복된 고상관 피처를 제거합니다. `em_v28`은 em_v16의 OOF signature와 em_v20의 기능 변이 지지도·안정 유전자 consequence one-hot을 중복 없는 단일 흐름으로 결합합니다. `em_v26`과 `em_v27`을 포함한 모든 TCGA 기반 파이프라인은 원본 26개 레이블을 변경하지 않습니다. 사용할 버전은 설정 YAML의 `preprocessing.name`으로 선택합니다.
+
+`em_v15` 이후 학습 결과에는 5-fold OOF 최종 Macro F1과 fold 평균·표준편차가 기록됩니다. 모든 버전에서 동일한 80% 학습 점수, 20% 검증 점수, 두 점수의 차이와 과적합 여부도 함께 출력됩니다.
+
+선정된 `em_v16` E4 실험 조건은 다음 설정으로 실행합니다.
+
+```bash
+# E4: OOF Macro F1과 fold 안정성이 가장 좋은 조건
+python -m src.train --config configs/test_005.yaml
+```
+
+`test_005.yaml`은 OOF와 80/20 검증에서 조기 종료를 적용하고, 전체 데이터 최종 학습에서는 fold별 최적 트리 수의 중앙값으로 모델을 다시 학습합니다.
+
+토큰 기반 `em_v17`은 다음 설정으로 실행하며, 결과는 `experiments/em_v17_token_feature_experiments.md`에 기록됩니다.
+
+```bash
+python -m src.train --config configs/test_007.yaml
+```
+
+동의 변이와 기능 변이를 분리하는 `em_v18`은 다음 설정으로 실행합니다.
+
+```bash
+python -m src.train --config configs/test_008.yaml
+```
+
+토큰 분포, OOF·과적합 결과와 생식세포 해석 제한은
+`experiments/em_v18_functional_consequence_experiment.md`에 기록됩니다.
+
+지지도 fold 내부 선택, 안정 유전자 one-hot과 E4형 조기 종료를 적용한 `em_v20`은
+다음 설정으로 실행합니다.
+
+```bash
+python -m src.train --config configs/test_010.yaml
+```
+
+em_v16 E4와 em_v17 결합 실험은 다음 설정으로 실행하며, 결과는
+`experiments/em_v19_em_v16_e4_plus_em_v17_experiments.md`에 기록됩니다.
+
+```bash
+python -m src.train --config configs/test_009.yaml
+```
 
 ## 실행 환경
 
