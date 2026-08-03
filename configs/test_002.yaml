@@ -1,12 +1,12 @@
 project:
   name: AH05dacon6
-  experiment_name: test_002
+  experiment_name: test_002_v09
   seed: 42
   python_version: "3.14"
 
 data:
   raw_dir: data/raw
-  processed_dir: data/processed/v01
+  processed_dir: data/processed/test_002_v09
   train_file: train.csv
   test_file: test.csv
   submission_file: sample_submission.csv
@@ -45,13 +45,16 @@ validation:
       - "34+"
 
 preprocessing:
-  name: jh_v01
+  name: jh_v09
   parser_version: jh_parser_v1
+  f4_min_support: 5
   features:
     f0_gene_mutation_presence: true
     f1_sample_summary: true
     f2_gene_consequence: false
-    f3_amino_acid_position: true
+    f3_global_amino_acid_position: true
+    f3_gene_aware_amino_acid_position: false
+    f4_exact_hotspot: true
   f3_position_bins:
     - "1-50"
     - "51-100"
@@ -60,17 +63,17 @@ preprocessing:
     - "401-800"
     - "801+"
   f1_scaling: fold_local_standard_scaler
+  tfidf_sublinear_tf: true
+  tfidf_norm: l2
 
 model:
-  name: logistic_regression
-  C: 1.0
+  name: linear_svc
+  C: 0.2
   class_weight: balanced
-  solver: saga
-  penalty: l2
-  max_iter: 3000
+  max_iter: 20000
   tol: 0.0001
-  n_jobs: -1
+  dual: auto
 
 training:
   metric: macro_f1
-  test_prediction: mean_probability_of_9_models
+  test_prediction: mean_decision_score_of_9_models

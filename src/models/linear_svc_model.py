@@ -13,4 +13,5 @@ def create_model(model_config: dict, seed: int) -> LinearSVC:
         max_iter=model_config.get("max_iter", 10_000),
         tol=model_config.get("tol", 1e-4),
         random_state=seed,
+        dual=model_config.get("dual", "auto"),
     )
