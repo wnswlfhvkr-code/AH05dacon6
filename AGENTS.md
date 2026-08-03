@@ -17,3 +17,10 @@
 - 버전별 구현은 해당 `pipeline_em_vN.py` 파일 안에서 독립적으로 이해하고 실행할 수 있어야 한다.
 - `base.py`에는 상수 열 제거, 범주형 인코딩, 레이블 인코딩처럼 모든 버전에 적용되는 기반 기능만 둔다.
 - 변이 행렬, 변이 빈도 선택, burden, consequence, signature처럼 실험 버전별 기능은 여러 버전에서 사용하더라도 해당 `pipeline_em_vN.py` 안에 각각 기록한다.
+
+## SUBCLASS label integrity
+
+- 모든 전처리·학습 파이프라인은 `train.csv`에 제공된 `SUBCLASS` 값을 서로 배타적인 원본 클래스 그대로 유지한다.
+- `GBMLGG`, `KIPAN`, `STES`는 각각 하나의 독립 클래스이며 하위 암종으로 분해하지 않는다.
+- `GBMLGG`를 `GBM`·`LGG`로, `KIPAN`을 `KICH`·`KIRC`·`KIRP`로, `STES`를 `STAD`·`ESCA`로 재매핑하거나 추정 분할하지 않는다.
+- 사용자가 명시적으로 레이블 체계 변경을 요청하지 않는 한 클래스 병합, 계층화, 이름 변경 또는 외부 임상 분류에 따른 타깃 재구성을 수행하지 않는다.
