@@ -1,3 +1,5 @@
+import ast
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -61,3 +63,116 @@ def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
         key: config["model"][key]
         for key in expected_model
     } == expected_model
+    pipeline_module = PIPELINES[pipeline_name].__module__
+    module_spec = importlib.util.find_spec(pipeline_module)
+
+    assert module_spec is not None
+    assert module_spec.origin is not None
+    assert Path(module_spec.origin).is_file()
+
+
+def test_test_004_config_uses_jsj_v2_pipeline() -> None:
+    config_path = ROOT / "configs" / "test_004.yaml"
+
+    with config_path.open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    assert (ROOT / "src" / "pipelines" / "pipeline_jsj_v2.py").is_file()
+    assert config["project"]["experiment_name"] == "test_004"
+    assert config["preprocessing"]["name"] == "jsj_v2"
+
+
+def test_test_003_config_uses_jyp_f7_pipeline() -> None:
+    config_path = ROOT / "configs" / "test_003.yaml"
+
+    with config_path.open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    assert config["model"]["name"] == "xgboost"
+    assert config["preprocessing"]["name"] == "jyp_f7"
+    assert PIPELINES["jyp_f7"].__module__.endswith("pipeline_jyp_f7")
+
+
+def test_jyp_pipelines_are_self_contained_in_their_dedicated_package() -> None:
+    source = ROOT / "src"
+    pipelines = source / "pipelines"
+    jyp = pipelines / "jyp_preprocessing"
+    selectable_files = sorted(path.name for path in jyp.glob("pipeline_jyp_*.py"))
+
+    assert selectable_files == [
+        "pipeline_jyp_f0.py",
+        "pipeline_jyp_f0_no_raw.py",
+        "pipeline_jyp_f1.py",
+        "pipeline_jyp_f2.py",
+        "pipeline_jyp_f3.py",
+        "pipeline_jyp_f3_no_raw.py",
+        "pipeline_jyp_f3_position.py",
+        "pipeline_jyp_f4.py",
+        "pipeline_jyp_f4_no_raw.py",
+        "pipeline_jyp_f5.py",
+        "pipeline_jyp_f5_no_raw.py",
+        "pipeline_jyp_f5_no_raw_missmask.py",
+        "pipeline_jyp_f5_selective_no_raw.py",
+        "pipeline_jyp_f6.py",
+        "pipeline_jyp_f7.py",
+        "pipeline_jyp_raw.py",
+    ]
+    assert not list(pipelines.glob("pipeline_jyp_*.py"))
+    assert not (jyp / "validation").exists()
+    assert not (jyp / "pipeline_base.py").exists()
+    assert not (jyp / "mutation_parser.py").exists()
+    assert not list(jyp.glob("feature_f*.py"))
+
+
+def test_jyp_pipeline_files_do_not_import_each_other() -> None:
+    jyp = ROOT / "src" / "pipelines" / "jyp_preprocessing"
+
+    for path in jyp.glob("pipeline_jyp_*.py"):
+        syntax_tree = ast.parse(path.read_text(encoding="utf-8"))
+        cross_imports = [
+            node.module
+            for node in ast.walk(syntax_tree)
+            if isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and node.module.startswith("src.pipelines.jyp_preprocessing.pipeline_jyp_")
+        ]
+        assert not cross_imports, f"{path.name} has JYP cross-imports: {cross_imports}"
+
+
+def test_shared_src_has_no_jyp_experiment_entrypoints() -> None:
+    source = ROOT / "src"
+    excluded = [
+        source / "analyze_burden_shift.py",
+        source / "export_preprocessing_optimizer_results.py",
+        source / "optimize_preprocessing.py",
+        source / "validate_preprocessing_all.py",
+        source / "pipelines" / "pipeline_jyp_v1.py",
+    ]
+
+    assert not [path for path in excluded if path.exists()]
+
+
+def test_shared_trainer_uses_fit_transform_for_validation_training_data() -> None:
+    train_path = ROOT / "src" / "train.py"
+    syntax_tree = ast.parse(train_path.read_text(encoding="utf-8"))
+    train_x_assignments = [
+        node.value
+        for node in ast.walk(syntax_tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "train_x"
+            for target in node.targets
+        )
+    ]
+
+    assert len(train_x_assignments) == 1
+    call = train_x_assignments[0]
+    assert isinstance(call, ast.Call)
+    assert isinstance(call.func, ast.Attribute)
+    assert isinstance(call.func.value, ast.Name)
+    assert call.func.value.id == "validation_preprocessor"
+    assert call.func.attr == "fit_transform"
+    assert [
+        argument.id if isinstance(argument, ast.Name) else None
+        for argument in call.args
+    ] == ["train_features", "train_labels"]

@@ -32,7 +32,22 @@ python -m src.train --config configs/baseline.yaml
 
 검증 Macro F1은 화면과 `data/processed/baseline_metrics.json`에 기록되며, 제출 파일은 `data/processed/baseline_submission.csv`에 생성됩니다.
 
-새 모델은 `src/models/`에 생성 함수를 추가하고, `src/models/__init__.py`의 `MODEL_BUILDERS`에 등록한 뒤 `configs/`에 해당 모델의 설정 파일을 추가합니다.
+새 모델은 `src/models/`에 생성 함수를 추가하고
+`src/models/__init__.py`의 `MODEL_BUILDERS`에 등록합니다. 팀원별 실험
+설정은 `configs/test_001.yaml`부터 `test_004.yaml`까지 분리하여 사용합니다.
+
+현재 등록된 모델은 `xgboost`, `lightgbm`, `linear_svc`,
+`wc_tfidf_lsvc_lgbm`입니다. 정세준 실험은 `test_004.yaml`에서 관리합니다.
+
+```bash
+python -m src.train --config configs/test_004.yaml
+```
+
+`wc_tfidf_lsvc_lgbm`은 기존 Public 0.3714981583 제출의 핵심 구성인
+Word+Char TF-IDF, LinearSVC 95%, 트리 모델 5%, 클래스 보정을
+협업 저장소에서 다시 학습할 수 있도록 구성한 버전입니다. 기존 제출은
+여러 OOF 산출물을 결합했으므로 새 실행 결과가 기존 제출 파일과 완전히
+같다고 가정하지 않으며, 동일한 검증 조건에서 다시 비교해야 합니다.
 
 ## 데이터 품질 점검
 
@@ -42,7 +57,44 @@ python -m src.data_quality --config configs/baseline.yaml
 
 ## 전처리 파이프라인
 
-설정 파일의 `preprocessing.name`에서 전처리 파이프라인을 선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩, 타깃 레이블 인코딩을 적용합니다. 순서 인코더는 학습 데이터에 없는 값을 `-1`로 변환합니다. 새 파이프라인은 `src/pipelines/`에 추가한 뒤 설정 파일의 이름만 바꿔 같은 모델 조건에서 비교합니다.
+각 팀원 설정 파일의 `preprocessing.name`에서 전처리 파이프라인을
+선택합니다. 현재 `baseline`은 상수 피처 제거, 범주형 순서 인코딩,
+타깃 레이블 인코딩을 적용합니다. 새 파이프라인은 `src/pipelines/`에
+추가하고 레지스트리에 등록한 뒤, `preprocessing.name`만 바꿔 같은
+모델 조건에서 비교합니다.
+
+기본·EM·JSJ 파이프라인은 `baseline`, `em_v1`~`em_v14`, `jsj_v1`~`jsj_v8`입니다.
+현재 `configs/test_004.yaml`은 XGBoost용 압축 구조 피처인 `jsj_v2`를 사용합니다.
+
+`em_v14`는 기능 결과·암종 signature에 학습 Fold에서 반복 관측된 hotspot
+변이를 추가합니다. `configs/test_001.yaml`에서 선택할 수 있습니다.
+
+### JYP test_003
+
+`configs/test_003.yaml`은 모델 `xgboost`와 전처리
+`jyp_f7`을 사용합니다. JYP 전처리 16개는
+`src/pipelines/jyp_preprocessing/`의 독립 파이프라인 파일로 구성되며,
+설정의 `preprocessing.name`으로 선택합니다.
+
+- `jyp_raw`, `jyp_f0`, `jyp_f0_no_raw`, `jyp_f1`, `jyp_f2`
+- `jyp_f3_position`, `jyp_f3`, `jyp_f3_no_raw`, `jyp_f4`, `jyp_f4_no_raw`
+- `jyp_f5`, `jyp_f5_no_raw`, `jyp_f5_no_raw_missmask`, `jyp_f5_selective_no_raw`
+- `jyp_f6`, `jyp_f7`
+
+별도 실행기 없이 공용 학습 명령을 사용합니다.
+
+```bash
+python -m src.train --config configs/test_003.yaml
+```
+
+## TEST_004 제출 재현
+
+정세준의 제출 6건은 `configs/test_004_1.yaml`부터
+`configs/test_004_6.yaml`까지 분리되어 있습니다.
+
+```bash
+python -m src.reproduce_test_004 --config configs/test_004_6.yaml
+```
 
 연구 파이프라인은 `em_v1~em_v28`이 등록되어 있습니다. `em_v15`는 5-fold OOF 평가를, `em_v16`은 학습 표본의 자기 정답 영향을 줄이는 inner-fold OOF signature를 적용합니다. `em_v17`은 셀 문자열 분리와 중복 토큰 제거 후 유전자별 mutation count, consequence, recurrent hotspot, multi-hit 피처를 생성합니다. `em_v18`은 동의 변이를 기능 변이 기반 유전자 선택·signature·hotspot에서 분리하며, `em_v19`는 em_v16 E4와 em_v17의 비중복 token 피처를 결합합니다. `em_v20`은 기능 변이 지지도 5/8/10을 fold 내부에서 선택하고 안정 유전자에만 consequence one-hot을 적용합니다. `em_v21`은 고차원 원시 변이와 불안정 hotspot을 축소합니다. `em_v22`는 em_v16에 em_v26의 TCGA study-family coarse signature를, `em_v23`은 em_v16에 em_v27의 관련 study 내부 fine contrast를 중복 없이 결합합니다. `em_v24`는 em_v16의 전체 변이 신호와 em_v18의 기능 변이 신호를 단일 consequence 처리와 OOF 분할 안에서 분리해 결합합니다. `em_v25`는 em_v16의 OOF 암종 signature와 em_v17의 token count·multi-hit·hotspot을 단일 토큰 처리 흐름에서 결합하고 구조적으로 중복된 고상관 피처를 제거합니다. `em_v28`은 em_v16의 OOF signature와 em_v20의 기능 변이 지지도·안정 유전자 consequence one-hot을 중복 없는 단일 흐름으로 결합합니다. `em_v26`과 `em_v27`을 포함한 모든 TCGA 기반 파이프라인은 원본 26개 레이블을 변경하지 않습니다. 사용할 버전은 설정 YAML의 `preprocessing.name`으로 선택합니다.
 

@@ -1,0 +1,40 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_004_5
+  author: 정세준
+  seed: 42
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  spec: TEST_004_5
+  n_splits: 5
+  linear_c: 0.2
+  temperature: 0.5
+  linear_weight: 0.95
+  base_tree_weight: 0.025
+  e1_tree_weight: 0.025
+
+preprocessing:
+  name: jsj_v7
+  word_ngram_range: [1, 2]
+  word_min_df: 2
+  word_max_features: 250000
+  char_ngram_range: [3, 5]
+  char_min_df: 3
+  char_max_features: 180000
+  char_weight: 0.5
+
+record:
+  submitted: true
+  submission_date: 2026-07-31
+  historical_public_macro_f1: 0.3863356794
+  historical_oof_macro_f1: 0.5149647043026445
+  original_submission: submission_last_kc020_kw10_gc010_go+0.10_gw100.csv
