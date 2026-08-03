@@ -521,6 +521,27 @@ def main():
 
         auxiliary_pair_oof[pair_name] = auxiliary_right_probability(auxiliary_oof)
         auxiliary_pair_test[pair_name] = auxiliary_right_probability(auxiliary_test)
+
+    # 후속 앙상블 실험이 TEST_004_6의 학습 결과를 다시 사용할 수 있도록
+    # 누출 없는 OOF/테스트 확률과 충돌 전문가 출력을 저장합니다.
+    # data/processed는 Git 제외 대상이므로 원자료나 예측값이 저장소에 올라가지 않습니다.
+    experiment_name = config["project"]["experiment_name"]
+    if not args.quick and experiment_name.lower() == "test_004_6":
+        np.savez_compressed(
+            output_dir / "test_004_6_ensemble_inputs.npz",
+            corrected_oof=corrected_oof,
+            corrected_test=corrected_test,
+            k_specialist_oof=specialist_oof["KIRC_KIPAN"],
+            k_specialist_test=specialist_test["KIRC_KIPAN"],
+            g_specialist_oof=specialist_oof["LGG_GBMLGG"],
+            g_specialist_test=specialist_test["LGG_GBMLGG"],
+            em14_k_oof=auxiliary_pair_oof["KIRC_KIPAN"],
+            em14_k_test=auxiliary_pair_test["KIRC_KIPAN"],
+            fold_ids=fold_ids,
+            y=y,
+            classes=classes.astype(str),
+            dataset_signature=np.asarray(signature),
+        )
     oof_prediction = redistribute(
         corrected_oof,
         specialist_oof,
@@ -540,7 +561,6 @@ def main():
         for fold in range(n_splits)
     ]
     oof_score = f1_score(y, oof_prediction, average="macro")
-    experiment_name = config["project"]["experiment_name"]
     submission[target] = encoder.inverse_transform(test_prediction)
     submission_path = output_dir / f"{experiment_name}_submission.csv"
     submission.to_csv(submission_path, index=False, encoding="utf-8-sig")
