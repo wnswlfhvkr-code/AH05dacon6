@@ -15,6 +15,19 @@ from src.pipelines.pipeline_em_v11 import EMV11PreprocessingPipeline
 from src.pipelines.pipeline_em_v12 import EMV12PreprocessingPipeline
 from src.pipelines.pipeline_em_v13 import EMV13PreprocessingPipeline
 from src.pipelines.pipeline_em_v14 import EMV14PreprocessingPipeline
+from src.pipelines.pipeline_em_v15 import EMV15PreprocessingPipeline
+from src.pipelines.pipeline_em_v16 import EMV16PreprocessingPipeline
+from src.pipelines.pipeline_em_v17 import EMV17PreprocessingPipeline
+from src.pipelines.pipeline_em_v18 import EMV18PreprocessingPipeline
+from src.pipelines.pipeline_em_v19 import EMV19PreprocessingPipeline
+from src.pipelines.pipeline_em_v20 import EMV20PreprocessingPipeline
+from src.pipelines.pipeline_em_v21 import EMV21PreprocessingPipeline
+from src.pipelines.pipeline_em_v22 import EMV22PreprocessingPipeline
+from src.pipelines.pipeline_em_v23 import EMV23PreprocessingPipeline
+from src.pipelines.pipeline_em_v24 import EMV24PreprocessingPipeline
+from src.pipelines.pipeline_em_v25 import EMV25PreprocessingPipeline
+from src.pipelines.pipeline_em_v26 import EMV26PreprocessingPipeline
+from src.pipelines.pipeline_em_v27 import EMV27PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v1 import JSJV1PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v2 import JSJV2PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v3 import JSJV3PreprocessingPipeline
@@ -23,6 +36,42 @@ from src.pipelines.pipeline_jsj_v5 import JSJV5PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v6 import JSJV6PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v7 import JSJV7PreprocessingPipeline
 from src.pipelines.pipeline_jsj_v8 import JSJV8PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f0 import F0PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f0_no_raw import (
+    F0NoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f1 import F1PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f2 import F2PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f3 import F3PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f3_no_raw import (
+    F3NoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f3_position import (
+    F3PositionPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f4 import F4PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f4_no_raw import (
+    F4NoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f5 import F5PreprocessingPipeline
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f5_no_raw import (
+    F5NoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f5_no_raw_missmask import (
+    F5NoRawMissmaskPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f5_selective_no_raw import (
+    F5SelectiveNoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f6 import (
+    F6NoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f7 import (
+    F7PairContrastNoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_raw import RawPreprocessingPipeline
+from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
+
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -40,6 +89,19 @@ PIPELINES = {
     "em_v12": EMV12PreprocessingPipeline,
     "em_v13": EMV13PreprocessingPipeline,
     "em_v14": EMV14PreprocessingPipeline,
+    "em_v15": EMV15PreprocessingPipeline,
+    "em_v16": EMV16PreprocessingPipeline,
+    "em_v17": EMV17PreprocessingPipeline,
+    "em_v18": EMV18PreprocessingPipeline,
+    "em_v19": EMV19PreprocessingPipeline,
+    "em_v20": EMV20PreprocessingPipeline,
+    "em_v21": EMV21PreprocessingPipeline,
+    "em_v22": EMV22PreprocessingPipeline,
+    "em_v23": EMV23PreprocessingPipeline,
+    "em_v24": EMV24PreprocessingPipeline,
+    "em_v25": EMV25PreprocessingPipeline,
+    "em_v26": EMV26PreprocessingPipeline,
+    "em_v27": EMV27PreprocessingPipeline,
     "jsj_v1": JSJV1PreprocessingPipeline,
     "jsj_v2": JSJV2PreprocessingPipeline,
     "jsj_v3": JSJV3PreprocessingPipeline,
@@ -48,6 +110,23 @@ PIPELINES = {
     "jsj_v6": JSJV6PreprocessingPipeline,
     "jsj_v7": JSJV7PreprocessingPipeline,
     "jsj_v8": JSJV8PreprocessingPipeline,
+    "jyp_raw": RawPreprocessingPipeline,
+    "jyp_f0": F0PreprocessingPipeline,
+    "jyp_f0_no_raw": F0NoRawPreprocessingPipeline,
+    "jyp_f1": F1PreprocessingPipeline,
+    "jyp_f2": F2PreprocessingPipeline,
+    "jyp_f3_position": F3PositionPreprocessingPipeline,
+    "jyp_f3": F3PreprocessingPipeline,
+    "jyp_f3_no_raw": F3NoRawPreprocessingPipeline,
+    "jyp_f4": F4PreprocessingPipeline,
+    "jyp_f4_no_raw": F4NoRawPreprocessingPipeline,
+    "jyp_f5": F5PreprocessingPipeline,
+    "jyp_f5_no_raw": F5NoRawPreprocessingPipeline,
+    "jyp_f5_no_raw_missmask": F5NoRawMissmaskPreprocessingPipeline,
+    "jyp_f5_selective_no_raw": F5SelectiveNoRawPreprocessingPipeline,
+    "jyp_f6": F6NoRawPreprocessingPipeline,
+    "jyp_f7": F7PairContrastNoRawPreprocessingPipeline,
+    "jh_v01": JHV01PreprocessingPipeline,
 }
 
 
