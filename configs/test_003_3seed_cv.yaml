@@ -1,6 +1,11 @@
+# 3-seed x 5-Fold 안정성 검증 공용 설정입니다.
+# 다음 실행에서는 아래 두 줄만 함께 변경합니다.
+# - project.experiment_name
+# - preprocessing.name
+
 project:
   name: AH05dacon6
-  experiment_name: test_003_jyp_f11
+  experiment_name: test_003_jyp_f9_3seed_cv
   seed: 42
   python_version: "3.14"
 
@@ -8,8 +13,6 @@ data:
   raw_dir: data/raw
   processed_dir: data/processed
   train_file: train.csv
-  test_file: test.csv
-  submission_file: sample_submission.csv
   target_column: SUBCLASS
   id_column: ID
 
@@ -22,28 +25,12 @@ model:
   eval_metric: mlogloss
   tree_method: hist
 
-training:
-  validation_fraction: 0.2
-  stratify: true
-  metric: macro_f1
-
 preprocessing:
-  name: jyp_f11
+  name: jyp_f9
   burden_clip_quantile: 0.99
   f3_position_min_support: 3
   f3_aa_min_support: 3
   f4_min_support: 5
-
-  # f5_top_k_per_class: 10
-  # f5_min_gene_support: 3
-  # f5_laplace_alpha: 1.0
-  # f5_stability_folds: 5
-  # f5_min_direction_consistency: 3
-  # f5_min_selection_frequency: 2
-  # f5_random_state: 42
-
-  # f5_output_rare_class_count: 10
-
   f7_pairs:
     - [KIRC, KIPAN]
     - [LGG, GBMLGG]
@@ -55,5 +42,12 @@ preprocessing:
   f7_min_direction_consistency: 4
   f7_min_selection_frequency: 3
   f7_random_state: 42
-  show_progress: true
+  show_progress: false
   progress_interval: 25000
+
+stability_validation:
+  seeds: [101, 2027, 7301]
+  n_splits: 5
+  metric: macro_f1
+  show_progress: true
+  resume: true
