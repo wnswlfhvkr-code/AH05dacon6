@@ -52,7 +52,7 @@ training:
   overfit_threshold: 0.1
 
 preprocessing:
-  name: em_v27
+  name: em_v30
   min_mutation_count: 5
   top_genes_per_class: 20
   smoothing: 0.5

@@ -1,0 +1,50 @@
+# test_005
+
+| 항목 | 결과 |
+| --- | --- |
+| 실행 시각 | 2026-08-03T17:27:14+09:00 |
+| 모델 | xgboost |
+| 전처리 파이프라인 | em_v43 |
+| 선택된 최소 변이 횟수 | 5 |
+| 학습 데이터 행 수 | 6201 |
+| 피처 수 | 4720 |
+| 최종 Macro F1 | 0.418057 |
+| 80% 학습 Macro F1 | 0.571415 |
+| 20% 검증 Macro F1 | 0.420384 |
+| 과적합 격차 | 0.151031 |
+| 과적합 여부 | True |
+| 설정 파일 | `configs/test_043.yaml` |
+| 제출 파일 | `data/processed/test_005_submission.csv` |
+| 모델 아티팩트 | `models/test_005.pkl` |
+
+## 하이퍼파라미터
+
+```yaml
+name: xgboost
+n_estimators: 500
+learning_rate: 0.03
+max_depth: 3
+min_child_weight: 5.0
+subsample: 0.75
+colsample_bytree: 0.6
+reg_alpha: 0.5
+reg_lambda: 10.0
+early_stopping_rounds: 30
+n_jobs: -1
+eval_metric: mlogloss
+tree_method: hist
+```
+
+## 전처리 설정
+
+```yaml
+name: em_v43
+min_mutation_count: 5
+top_genes_per_class: 20
+smoothing: 0.5
+max_log2_odds: 8.0
+shrinkage: 10.0
+min_hotspot_count: 5
+max_hotspots: 384
+inner_signature_folds: 5
+```

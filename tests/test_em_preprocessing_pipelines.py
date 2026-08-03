@@ -38,6 +38,21 @@ from src.pipelines.pipeline_em_v25 import EMV25PreprocessingPipeline
 from src.pipelines.pipeline_em_v26 import EMV26PreprocessingPipeline
 from src.pipelines.pipeline_em_v27 import EMV27PreprocessingPipeline
 from src.pipelines.pipeline_em_v28 import EMV28PreprocessingPipeline
+from src.pipelines.pipeline_em_v29 import EMV29PreprocessingPipeline
+from src.pipelines.pipeline_em_v30 import EMV30PreprocessingPipeline
+from src.pipelines.pipeline_em_v31 import EMV31PreprocessingPipeline
+from src.pipelines.pipeline_em_v32 import EMV32PreprocessingPipeline
+from src.pipelines.pipeline_em_v33 import EMV33PreprocessingPipeline
+from src.pipelines.pipeline_em_v34 import EMV34PreprocessingPipeline
+from src.pipelines.pipeline_em_v35 import EMV35PreprocessingPipeline
+from src.pipelines.pipeline_em_v36 import EMV36PreprocessingPipeline
+from src.pipelines.pipeline_em_v37 import EMV37PreprocessingPipeline
+from src.pipelines.pipeline_em_v38 import EMV38PreprocessingPipeline
+from src.pipelines.pipeline_em_v39 import EMV39PreprocessingPipeline
+from src.pipelines.pipeline_em_v40 import EMV40PreprocessingPipeline
+from src.pipelines.pipeline_em_v41 import EMV41PreprocessingPipeline
+from src.pipelines.pipeline_em_v42 import EMV42PreprocessingPipeline
+from src.pipelines.pipeline_em_v43 import EMV43PreprocessingPipeline
 from src.pipelines.preprocessing_registry import create_preprocessing_pipeline
 
 
@@ -308,6 +323,21 @@ NEW_PIPELINES = (
     EMV26PreprocessingPipeline,
     EMV27PreprocessingPipeline,
     EMV28PreprocessingPipeline,
+    EMV29PreprocessingPipeline,
+    EMV30PreprocessingPipeline,
+    EMV31PreprocessingPipeline,
+    EMV32PreprocessingPipeline,
+    EMV33PreprocessingPipeline,
+    EMV34PreprocessingPipeline,
+    EMV35PreprocessingPipeline,
+    EMV36PreprocessingPipeline,
+    EMV37PreprocessingPipeline,
+    EMV38PreprocessingPipeline,
+    EMV39PreprocessingPipeline,
+    EMV40PreprocessingPipeline,
+    EMV41PreprocessingPipeline,
+    EMV42PreprocessingPipeline,
+    EMV43PreprocessingPipeline,
 )
 
 
@@ -646,7 +676,7 @@ def test_em_v25_combines_oof_signature_and_token_features_without_duplicates() -
     assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
 
 
-def test_em_v28_combines_oof_signature_and_stable_consequence_without_duplicates() -> None:
+def test_em_v28_combines_oof_signature_and_capacity_reduction_without_duplicates() -> None:
     labels = pd.Series(["A"] * 6 + ["B"] * 6 + ["C"] * 6)
     features = pd.DataFrame({
         "GENE_A": ["A1V", "A1V", "A1V L2L", "R3*", "A1V", "WT"] + ["WT"] * 12,
@@ -654,6 +684,36 @@ def test_em_v28_combines_oof_signature_and_stable_consequence_without_duplicates
         "GENE_C": ["WT"] * 12 + ["C3D", "C3D", "C3D", "10_11AA>VV", "C3D", "WT"],
     })
     pipeline = EMV28PreprocessingPipeline(
+        min_functional_mutation_count=1,
+        max_raw_gene_features=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        stable_hotspot_folds=3,
+        min_stable_hotspot_folds=2,
+        max_stable_hotspots=2,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert any(column.startswith("signature_A_") for column in transformed)
+    assert len(pipeline.raw_gene_columns) == 2
+    assert len(pipeline.hotspots_) <= 2
+    assert not any(column.endswith("_match_count") for column in transformed)
+    assert not any(column.startswith("stable_GENE_A_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+def test_em_v29_does_not_duplicate_v16_features_already_present_in_v19() -> None:
+    labels = pd.Series(["A"] * 6 + ["B"] * 6 + ["C"] * 6)
+    features = pd.DataFrame({
+        "GENE_A": ["A1V", "A1V", "A1V L2L", "R3*", "A1V", "WT"] + ["WT"] * 12,
+        "GENE_B": ["WT"] * 6 + ["B2C", "B2C", "B2C", "Q4FS", "B2C", "WT"] + ["WT"] * 6,
+        "GENE_C": ["WT"] * 12 + ["C3D", "C3D", "C3D", "10_11AA>VV", "C3D", "WT"],
+    })
+    pipeline = EMV29PreprocessingPipeline(
         min_mutation_count=1,
         top_genes_per_class=1,
         min_hotspot_count=2,
@@ -669,6 +729,205 @@ def test_em_v28_combines_oof_signature_and_stable_consequence_without_duplicates
 
     assert transformed.columns.is_unique
     assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
-    assert any(column.startswith("signature_A_") for column in transformed)
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
     assert any(column.startswith("stable_GENE_A_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+def make_v16_combination_features() -> tuple[pd.DataFrame, pd.Series]:
+    labels = pd.Series(["A"] * 6 + ["B"] * 6 + ["C"] * 6)
+    features = pd.DataFrame({
+        "GENE_A": ["A1V", "A1V", "A1V B2C", "R3*", "A1V", "WT"] + ["WT"] * 12,
+        "GENE_B": ["WT"] * 6 + ["B2C", "B2C", "B2C C3*", "B2C", "B2C", "WT"] + ["WT"] * 6,
+        "GENE_C": ["WT"] * 12 + ["C3D", "C3D", "C3D D4D", "C3D", "C3D", "WT"],
+        "RARE": ["R1K"] + ["WT"] * 17,
+    })
+    return features, labels
+
+
+def test_em_v30_adds_only_v5_burden_features_missing_from_v16() -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = EMV30PreprocessingPipeline(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert "mutation_burden_total" in transformed
+    assert "mutation_burden_rate" in transformed
+    assert any(column.startswith("signature_A_") for column in transformed)
+
+
+@pytest.mark.parametrize(
+    "pipeline_class",
+    (EMV31PreprocessingPipeline, EMV32PreprocessingPipeline),
+)
+def test_em_v31_v32_do_not_duplicate_features_already_present_in_v16(
+    pipeline_class,
+) -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = pipeline_class(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
+    assert any(column.startswith("consequence_count_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+@pytest.mark.parametrize(
+    "pipeline_class",
+    (EMV33PreprocessingPipeline, EMV34PreprocessingPipeline, EMV36PreprocessingPipeline),
+)
+def test_em_v33_v34_v36_keep_only_nonduplicate_full_burden_features(
+    pipeline_class,
+) -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = pipeline_class(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert "mutation_burden_total" in transformed
+    assert "mutation_burden_rate" in transformed
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
+
+
+def test_em_v35_does_not_duplicate_v12_features_already_present_in_v16() -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = EMV35PreprocessingPipeline(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
+    assert any(column.startswith("hotspot_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+def test_em_v37_does_not_duplicate_v14_features_already_present_in_v16() -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = EMV37PreprocessingPipeline(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
+    assert any(column.startswith("hotspot_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+def test_em_v38_keeps_outer_and_inner_oof_at_separate_levels() -> None:
+    features, labels = make_v16_combination_features()
+    pipeline = EMV38PreprocessingPipeline(
+        min_mutation_count=2,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert pipeline.evaluation_folds == 5
+    assert pipeline.inner_signature_folds == 2
+    assert transformed.columns.is_unique
+    assert transformed.columns.tolist().count("mutation_burden_log1p") == 1
+    assert len([column for column in transformed if column.startswith("signature_A_")]) == 2
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+def make_v24_combination_features() -> tuple[pd.DataFrame, pd.Series]:
+    labels = pd.Series(["A"] * 6 + ["B"] * 6 + ["C"] * 6)
+    features = pd.DataFrame({
+        "GENE_A": ["A1V", "A1V L4L", "A1V", "A1V L4L", "A1V", "WT"] + ["WT"] * 12,
+        "GENE_B": ["WT"] * 6 + ["B2C", "B2C", "B2C", "B2C", "B2C", "WT"] + ["WT"] * 6,
+        "GENE_C": ["WT"] * 12 + ["C3D", "C3D", "C3D", "C3D", "C3D", "WT"],
+    })
+    return features, labels
+
+
+@pytest.mark.parametrize(
+    "pipeline_class",
+    (EMV39PreprocessingPipeline, EMV40PreprocessingPipeline, EMV41PreprocessingPipeline),
+)
+def test_em_v39_v40_v41_do_not_duplicate_features_already_present_in_v24(
+    pipeline_class,
+) -> None:
+    features, labels = make_v24_combination_features()
+    pipeline = pipeline_class(
+        min_mutation_count=1,
+        min_functional_mutation_count=1,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert any(column.startswith("signature_all_A_") for column in transformed)
+    assert any(column.startswith("signature_functional_A_") for column in transformed)
+    assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
+
+
+@pytest.mark.parametrize(
+    "pipeline_class",
+    (EMV42PreprocessingPipeline, EMV43PreprocessingPipeline),
+)
+def test_em_v42_v43_add_only_nonfunctional_hotspots_missing_from_v24(
+    pipeline_class,
+) -> None:
+    features, labels = make_v24_combination_features()
+    pipeline = pipeline_class(
+        min_mutation_count=1,
+        min_functional_mutation_count=1,
+        top_genes_per_class=1,
+        min_hotspot_count=2,
+        max_hotspots=4,
+        inner_signature_folds=2,
+    )
+
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert transformed.columns.is_unique
+    assert any(column.startswith("hotspot_") for column in transformed)
+    assert any(column.startswith("synonymous_hotspot_") for column in transformed)
+    assert pipeline.evaluation_folds == 5
     assert pipeline.__class__.__bases__ == (PreprocessingPipeline,)
