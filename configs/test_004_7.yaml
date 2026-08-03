@@ -48,5 +48,5 @@ record:
   submitted: false
   historical_oof_macro_f1: 0.528569659777493
   historical_public_macro_f1: null
-  candidate_submission: TEST_004_7_submission.csv
+  candidate_submission: EM_SJ_pipeComb_v1.csv
   external_data_used: false

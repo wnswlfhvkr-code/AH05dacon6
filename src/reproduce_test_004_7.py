@@ -238,7 +238,7 @@ def main():
     ]
     score = f1_score(y, oof_prediction, average="macro")
     submission[target] = encoder.inverse_transform(test_prediction)
-    submission_path = output / "TEST_004_7_submission.csv"
+    submission_path = output / config["record"]["candidate_submission"]
     submission.to_csv(submission_path, index=False, encoding="utf-8-sig")
     result = {
         "experiment": "TEST_004_7",
