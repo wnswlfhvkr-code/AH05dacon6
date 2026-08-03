@@ -72,6 +72,22 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f7 import (
 from src.pipelines.jyp_preprocessing.pipeline_jyp_raw import RawPreprocessingPipeline
 from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
 
+from src.pipelines.pipeline_em_v28 import EMV28PreprocessingPipeline
+from src.pipelines.pipeline_em_v29 import EMV29PreprocessingPipeline
+from src.pipelines.pipeline_em_v30 import EMV30PreprocessingPipeline
+from src.pipelines.pipeline_em_v31 import EMV31PreprocessingPipeline
+from src.pipelines.pipeline_em_v32 import EMV32PreprocessingPipeline
+from src.pipelines.pipeline_em_v33 import EMV33PreprocessingPipeline
+from src.pipelines.pipeline_em_v34 import EMV34PreprocessingPipeline
+from src.pipelines.pipeline_em_v35 import EMV35PreprocessingPipeline
+from src.pipelines.pipeline_em_v36 import EMV36PreprocessingPipeline
+from src.pipelines.pipeline_em_v37 import EMV37PreprocessingPipeline
+from src.pipelines.pipeline_em_v38 import EMV38PreprocessingPipeline
+from src.pipelines.pipeline_em_v39 import EMV39PreprocessingPipeline
+from src.pipelines.pipeline_em_v40 import EMV40PreprocessingPipeline
+from src.pipelines.pipeline_em_v41 import EMV41PreprocessingPipeline
+from src.pipelines.pipeline_em_v42 import EMV42PreprocessingPipeline
+from src.pipelines.pipeline_em_v43 import EMV43PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -127,6 +143,22 @@ PIPELINES = {
     "jyp_f6": F6NoRawPreprocessingPipeline,
     "jyp_f7": F7PairContrastNoRawPreprocessingPipeline,
     "jh_v01": JHV01PreprocessingPipeline,
+    "em_v28": EMV28PreprocessingPipeline,
+    "em_v29": EMV29PreprocessingPipeline,
+    "em_v30": EMV30PreprocessingPipeline,
+    "em_v31": EMV31PreprocessingPipeline,
+    "em_v32": EMV32PreprocessingPipeline,
+    "em_v33": EMV33PreprocessingPipeline,
+    "em_v34": EMV34PreprocessingPipeline,
+    "em_v35": EMV35PreprocessingPipeline,
+    "em_v36": EMV36PreprocessingPipeline,
+    "em_v37": EMV37PreprocessingPipeline,
+    "em_v38": EMV38PreprocessingPipeline,
+    "em_v39": EMV39PreprocessingPipeline,
+    "em_v40": EMV40PreprocessingPipeline,
+    "em_v41": EMV41PreprocessingPipeline,
+    "em_v42": EMV42PreprocessingPipeline,
+    "em_v43": EMV43PreprocessingPipeline,
 }
 
 
