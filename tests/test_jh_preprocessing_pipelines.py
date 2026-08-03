@@ -2,14 +2,15 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from src.pipelines.pipeline_jh_v01 import (
-    JHV01PreprocessingPipeline,
+from src.pipelines.pipeline_jh_v04 import (
+    JHV04PreprocessingPipeline,
     build_profile_groups,
     make_class_burden_strata,
     parse_event,
     parse_wide_mutations,
     split_mutation_tokens,
 )
+from src.pipelines.pipeline_jh_v09 import JHV09PreprocessingPipeline
 
 
 def sample_features() -> pd.DataFrame:
@@ -22,16 +23,18 @@ def sample_features() -> pd.DataFrame:
 
 def test_parser_normalizes_and_classifies_events() -> None:
     assert split_mutation_tokens("WT R175H R175H") == ["R175H"]
+    assert split_mutation_tokens("MISSING") == []
+    assert split_mutation_tokens("WT MISSING R175H") == ["R175H"]
     assert parse_event("R213X")["exact_event"] == "R213*"
     assert parse_event("R213X")["consequence"] == "STOP"
     assert parse_event("K16fs")["consequence"] == "FRAMESHIFT"
     assert parse_event("E746_A750del")["consequence"] == "COMPLEX"
 
 
-def test_v01_pipeline_builds_sparse_f0_f1_f3_features() -> None:
+def test_v04_pipeline_builds_sparse_f0_f1_f3_features() -> None:
     features = sample_features()
     labels = pd.Series(["A", "A", "B", "B", "A", "B"])
-    pipeline = JHV01PreprocessingPipeline()
+    pipeline = JHV04PreprocessingPipeline()
     transformed = pipeline.fit_transform(features, labels)
     repeated = pipeline.transform(features)
 
@@ -42,6 +45,17 @@ def test_v01_pipeline_builds_sparse_f0_f1_f3_features() -> None:
     assert pipeline.summary()["f0_features"] == 3
     assert pipeline.summary()["f3_features"] > 0
     assert np.isfinite(transformed.data).all()
+
+
+def test_missing_token_is_not_counted_as_mutation() -> None:
+    features = pd.DataFrame({"TP53": ["MISSING", "WT", None, "R175H"]})
+    labels = pd.Series(["A", "A", "B", "B"])
+    pipeline = JHV04PreprocessingPipeline()
+    transformed = pipeline.fit_transform(features, labels)
+
+    assert pipeline.summary()["f0_features"] == 1
+    assert transformed[:3, 0].nnz == 0
+    assert transformed[3, 0] == 1
 
 
 def test_profile_groups_keep_identical_profiles_together() -> None:
@@ -59,3 +73,18 @@ def test_class_burden_strata_are_valid_for_splits() -> None:
     assert len(strata) == len(labels)
     assert len(bins) == len(labels)
     assert strata.value_counts().min() >= 2
+
+
+def test_v09_applies_fold_fitted_tfidf_and_keeps_f1() -> None:
+    features = sample_features()
+    labels = pd.Series(["A", "A", "B", "B", "A", "B"])
+    pipeline = JHV09PreprocessingPipeline(f4_min_support=1)
+    transformed = pipeline.fit_transform(features, labels)
+    repeated = pipeline.transform(features)
+
+    assert sparse.isspmatrix_csr(transformed)
+    assert transformed.shape == repeated.shape
+    assert transformed.shape[0] == len(features)
+    assert pipeline.summary()["f1_features"] == 22
+    assert pipeline.summary()["tfidf_token_features"] > 0
+    assert np.isfinite(transformed.data).all()

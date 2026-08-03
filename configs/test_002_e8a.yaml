@@ -1,0 +1,50 @@
+project:
+  experiment_name: test_002_e8a
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  e7_dir: data/processed/test_002_v08
+  # Kaggle E7 확률과 Kaggle E8 decision 배열을 함께 보관한 폴더
+  e8_dir: data/processed/test_002_v08
+  output_dir: data/processed/test_002_e8a
+
+validation:
+  n_splits: 3
+  seeds:
+    - 42
+    - 2026
+    - 777
+
+# 팀 공통 설정 스키마에서 E8A의 E8 기반 전처리를 명시한다.
+preprocessing:
+  name: jh_v09
+
+ensemble:
+  temperatures:
+    - 0.25
+    - 0.40
+    - 0.60
+    - 0.80
+    - 1.00
+    - 1.25
+    - 1.50
+    - 2.00
+    - 3.00
+  e8_weights:
+    - 0.0
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5
+    - 0.6
+    - 0.7
+    - 0.8
+    - 0.9
+    - 1.0
+  bootstrap_repeats: 3000
+  bootstrap_seed: 20260803

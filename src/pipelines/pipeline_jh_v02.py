@@ -1,38 +1,60 @@
-"""JH v01: F0 유전자별 변이 유무."""
+"""JH v02: F0 유전자 변이 유무 + F1 환자별 변이 요약."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 from scipy import sparse
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import (
+    LabelEncoder,
+    StandardScaler,
+)
 
 from src.pipelines.pipeline_jh_v04 import (
     build_f0_matrix,
+    build_f1_matrix,
+    parse_wide_mutations,
 )
 from src.pipelines.base import PreprocessingPipeline
 
 
-class JHV01PreprocessingPipeline(PreprocessingPipeline):
-    """Fold-Train에서 변이가 관찰된 유전자만 F0으로 사용합니다."""
+class JHV02PreprocessingPipeline(PreprocessingPipeline):
+    """F0에 Fold-local scaling을 적용한 F1을 추가합니다."""
 
-    name = "jh_v01"
+    name = "jh_v02"
 
     def __init__(self, **_: object) -> None:
         self.label_encoder = LabelEncoder()
+        self.f1_scaler = StandardScaler()
+
         self.gene_columns: list[str] = []
-        self.f0_active_mask: np.ndarray | None = None
+        self.f1_feature_names: list[str] = []
+
+        self.f0_active_mask: (
+            np.ndarray | None
+        ) = None
 
     def fit(
         self,
         features: pd.DataFrame,
         labels: pd.Series,
-    ) -> "JHV01PreprocessingPipeline":
+    ) -> "JHV02PreprocessingPipeline":
         self.gene_columns = (
             features.columns.tolist()
         )
 
+        events = parse_wide_mutations(
+            features
+        )
+
         f0 = build_f0_matrix(features)
+
+        f1, self.f1_feature_names = (
+            build_f1_matrix(
+                events,
+                len(features),
+            )
+        )
 
         self.f0_active_mask = (
             np.asarray(
@@ -41,6 +63,7 @@ class JHV01PreprocessingPipeline(PreprocessingPipeline):
             > 0
         )
 
+        self.f1_scaler.fit(f1)
         self.label_encoder.fit(labels)
 
         return self
@@ -62,12 +85,33 @@ class JHV01PreprocessingPipeline(PreprocessingPipeline):
                 "fit을 먼저 실행해야 합니다."
             )
 
-        return (
-            build_f0_matrix(features)[
-                :,
-                self.f0_active_mask,
-            ]
-            .tocsr()
+        events = parse_wide_mutations(
+            features
+        )
+
+        f0 = build_f0_matrix(features)[
+            :,
+            self.f0_active_mask,
+        ]
+
+        f1, _ = build_f1_matrix(
+            events,
+            len(features),
+        )
+
+        f1_scaled = sparse.csr_matrix(
+            self.f1_scaler
+            .transform(f1)
+            .astype(np.float32)
+        )
+
+        return sparse.hstack(
+            [
+                f0,
+                f1_scaled,
+            ],
+            format="csr",
+            dtype=np.float32,
         )
 
     def fit_transform(
@@ -100,17 +144,21 @@ class JHV01PreprocessingPipeline(PreprocessingPipeline):
         )
 
     def summary(self) -> dict[str, int]:
-        if self.f0_active_mask is None:
-            return {
-                "f0_features": 0,
-                "remaining_features": 0,
-            }
+        f0_count = (
+            int(self.f0_active_mask.sum())
+            if self.f0_active_mask
+            is not None
+            else 0
+        )
 
-        count = int(
-            self.f0_active_mask.sum()
+        f1_count = len(
+            self.f1_feature_names
         )
 
         return {
-            "f0_features": count,
-            "remaining_features": count,
+            "f0_features": f0_count,
+            "f1_features": f1_count,
+            "remaining_features": (
+                f0_count + f1_count
+            ),
         }
