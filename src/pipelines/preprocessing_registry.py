@@ -64,11 +64,21 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f5_no_raw_missmask import (
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f5_selective_no_raw import (
     F5SelectiveNoRawPreprocessingPipeline,
 )
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f8 import F8PreprocessingPipeline
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f6 import (
     F6NoRawPreprocessingPipeline,
 )
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f7 import (
     F7PairContrastNoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f9 import (
+    F9GlobalAAPairNoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f10 import (
+    F10GlobalAACompositionNoRawPreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_jyp_f11 import (
+    F11AutoConfusionPairNoRawPreprocessingPipeline,
 )
 from src.pipelines.jyp_preprocessing.pipeline_jyp_raw import RawPreprocessingPipeline
 from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
@@ -142,8 +152,12 @@ PIPELINES = {
     "jyp_f5_no_raw": F5NoRawPreprocessingPipeline,
     "jyp_f5_no_raw_missmask": F5NoRawMissmaskPreprocessingPipeline,
     "jyp_f5_selective_no_raw": F5SelectiveNoRawPreprocessingPipeline,
+    "jyp_f8": F8PreprocessingPipeline,
     "jyp_f6": F6NoRawPreprocessingPipeline,
     "jyp_f7": F7PairContrastNoRawPreprocessingPipeline,
+    "jyp_f9": F9GlobalAAPairNoRawPreprocessingPipeline,
+    "jyp_f10": F10GlobalAACompositionNoRawPreprocessingPipeline,
+    "jyp_f11": F11AutoConfusionPairNoRawPreprocessingPipeline,
     "jh_v01": JHV01PreprocessingPipeline,
     "em_v28": EMV28PreprocessingPipeline,
     "em_v29": EMV29PreprocessingPipeline,

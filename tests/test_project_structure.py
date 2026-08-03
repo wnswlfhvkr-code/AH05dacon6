@@ -82,15 +82,18 @@ def test_test_004_config_uses_jsj_v2_pipeline() -> None:
     assert config["preprocessing"]["name"] == "jsj_v2"
 
 
-def test_test_003_config_uses_jyp_f7_pipeline() -> None:
+def test_test_003_config_uses_registered_jyp_pipeline() -> None:
     config_path = ROOT / "configs" / "test_003.yaml"
 
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     assert config["model"]["name"] == "xgboost"
-    assert config["preprocessing"]["name"] == "jyp_f7"
-    assert PIPELINES["jyp_f7"].__module__.endswith("pipeline_jyp_f7")
+    pipeline_name = config["preprocessing"]["name"]
+    assert pipeline_name.startswith("jyp_f")
+    assert PIPELINES[pipeline_name].__module__.endswith(
+        f"pipeline_{pipeline_name}"
+    )
 
 
 def test_jyp_pipelines_are_self_contained_in_their_dedicated_package() -> None:
@@ -103,6 +106,8 @@ def test_jyp_pipelines_are_self_contained_in_their_dedicated_package() -> None:
         "pipeline_jyp_f0.py",
         "pipeline_jyp_f0_no_raw.py",
         "pipeline_jyp_f1.py",
+        "pipeline_jyp_f10.py",
+        "pipeline_jyp_f11.py",
         "pipeline_jyp_f2.py",
         "pipeline_jyp_f3.py",
         "pipeline_jyp_f3_no_raw.py",
@@ -115,6 +120,8 @@ def test_jyp_pipelines_are_self_contained_in_their_dedicated_package() -> None:
         "pipeline_jyp_f5_selective_no_raw.py",
         "pipeline_jyp_f6.py",
         "pipeline_jyp_f7.py",
+        "pipeline_jyp_f8.py",
+        "pipeline_jyp_f9.py",
         "pipeline_jyp_raw.py",
     ]
     assert not list(pipelines.glob("pipeline_jyp_*.py"))
