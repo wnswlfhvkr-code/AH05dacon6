@@ -40,7 +40,11 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
 
     pipeline_name = config["preprocessing"]["name"]
     assert pipeline_name in PIPELINES
-    assert (ROOT / "src" / "pipelines" / f"pipeline_{pipeline_name}.py").is_file()
+    pipeline_module = PIPELINES[pipeline_name].__module__
+    module_spec = importlib.util.find_spec(pipeline_module)
+    assert module_spec is not None
+    assert module_spec.origin is not None
+    assert Path(module_spec.origin).is_file()
 
 
 def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:

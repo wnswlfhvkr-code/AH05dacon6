@@ -107,6 +107,48 @@ from src.pipelines.pipeline_em_v40 import EMV40PreprocessingPipeline
 from src.pipelines.pipeline_em_v41 import EMV41PreprocessingPipeline
 from src.pipelines.pipeline_em_v42 import EMV42PreprocessingPipeline
 from src.pipelines.pipeline_em_v43 import EMV43PreprocessingPipeline
+from src.pipelines.pipeline_em_v44 import EMV44PreprocessingPipeline
+from src.pipelines.pipeline_em_v45 import EMV45PreprocessingPipeline
+from src.pipelines.pipeline_em_v46 import EMV46PreprocessingPipeline
+from src.pipelines.pipeline_pipeComb_em_v1 import PipeCombEMV1PreprocessingPipeline
+from src.pipelines.pipeline_pipeComb_em_v2 import PipeCombEMV2PreprocessingPipeline
+from src.pipelines.pipeline_pipeComb_em_v1_001 import (
+    PipeCombEMV1001PreprocessingPipeline,
+)
+from src.pipelines.em_preprocessing.pipeline_em_E1 import EME1PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E2 import EME2PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E3 import EME3PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E4 import EME4PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E5 import EME5PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E6 import EME6PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E7 import EME7PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E8 import EME8PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E9 import EME9PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E10 import EME10PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E11 import EME11PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E12 import EME12PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E13 import EME13PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_E14 import EME14PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F01 import EMF01PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F02 import EMF02PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F03 import EMF03PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F04 import EMF04PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F05 import EMF05PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F06 import EMF06PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F07 import EMF07PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F08 import EMF08PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F09 import EMF09PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F10 import EMF10PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F11 import EMF11PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F12 import EMF12PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F13 import EMF13PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F14 import EMF14PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F15 import EMF15PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F16 import EMF16PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F17 import EMF17PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F18 import EMF18PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F19 import EMF19PreprocessingPipeline
+from src.pipelines.em_preprocessing.pipeline_em_F20 import EMF20PreprocessingPipeline
 
 PIPELINES = {
     "baseline": BaselinePreprocessingPipeline,
@@ -191,6 +233,46 @@ PIPELINES = {
     "em_v41": EMV41PreprocessingPipeline,
     "em_v42": EMV42PreprocessingPipeline,
     "em_v43": EMV43PreprocessingPipeline,
+    "em_v44": EMV44PreprocessingPipeline,
+    "em_v45": EMV45PreprocessingPipeline,
+    "em_v46": EMV46PreprocessingPipeline,
+    "pipeComb_em_v1": PipeCombEMV1PreprocessingPipeline,
+    "pipeComb_em_v2": PipeCombEMV2PreprocessingPipeline,
+    "pipeComb_em_v1_001": PipeCombEMV1001PreprocessingPipeline,
+    "em_E1": EME1PreprocessingPipeline,
+    "em_E2": EME2PreprocessingPipeline,
+    "em_E3": EME3PreprocessingPipeline,
+    "em_E4": EME4PreprocessingPipeline,
+    "em_E5": EME5PreprocessingPipeline,
+    "em_E6": EME6PreprocessingPipeline,
+    "em_E7": EME7PreprocessingPipeline,
+    "em_E8": EME8PreprocessingPipeline,
+    "em_E9": EME9PreprocessingPipeline,
+    "em_E10": EME10PreprocessingPipeline,
+    "em_E11": EME11PreprocessingPipeline,
+    "em_E12": EME12PreprocessingPipeline,
+    "em_E13": EME13PreprocessingPipeline,
+    "em_E14": EME14PreprocessingPipeline,
+    "em_F01": EMF01PreprocessingPipeline,
+    "em_F02": EMF02PreprocessingPipeline,
+    "em_F03": EMF03PreprocessingPipeline,
+    "em_F04": EMF04PreprocessingPipeline,
+    "em_F05": EMF05PreprocessingPipeline,
+    "em_F06": EMF06PreprocessingPipeline,
+    "em_F07": EMF07PreprocessingPipeline,
+    "em_F08": EMF08PreprocessingPipeline,
+    "em_F09": EMF09PreprocessingPipeline,
+    "em_F10": EMF10PreprocessingPipeline,
+    "em_F11": EMF11PreprocessingPipeline,
+    "em_F12": EMF12PreprocessingPipeline,
+    "em_F13": EMF13PreprocessingPipeline,
+    "em_F14": EMF14PreprocessingPipeline,
+    "em_F15": EMF15PreprocessingPipeline,
+    "em_F16": EMF16PreprocessingPipeline,
+    "em_F17": EMF17PreprocessingPipeline,
+    "em_F18": EMF18PreprocessingPipeline,
+    "em_F19": EMF19PreprocessingPipeline,
+    "em_F20": EMF20PreprocessingPipeline,
 }
 
 
