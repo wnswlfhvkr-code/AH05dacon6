@@ -1,4 +1,4 @@
-"""E8A: E7 확률과 E8 LinearSVC decision score의 cross-fit 보정 앙상블."""
+"""E8A: E7 확률과 E8 LinearSVC decision score의 cross-fit 보정 앙상블 실행기."""
 
 from __future__ import annotations
 

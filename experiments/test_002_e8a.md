@@ -64,7 +64,7 @@ E8A는 세 seed에서 E8보다 높은 OOF 성능을 기록했고, paired bootstr
 ## 재현 명령
 
 ```bash
-python -m src.ensemble_jh_e8a --config configs/test_002_e8a.yaml
+python -m src.train_ensemble_jh_e8a --config configs/test_002_e8a.yaml
 ```
 
 E7 확률 배열과 E8 decision score 배열은 `data/processed` 하위에 필요하며, 해당 결과 파일은 `.gitignore` 대상이다.
