@@ -71,6 +71,11 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
+    if config_path.name == "test_006.yaml":
+        assert config["project"]["experiment_name"] == "test_006"
+        assert (ROOT / "src" / "ensembles" / "train_jh_e8a.py").is_file()
+        return
+
     if config_path.parent.name == "ensembles":
         experiment_name = config["project"]["experiment_name"]
         suffix = experiment_name.removeprefix("test_002_")
@@ -103,6 +108,11 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
         pipeline_path = Path(module_spec.origin).resolve()
         assert pipeline_path.is_file()
         assert pipeline_path.is_relative_to((ROOT / "src" / "pipelines").resolve())
+
+
+def test_shared_sgkf_runner_uses_team_filename() -> None:
+    assert (ROOT / "src" / "train_sgkf.py").is_file()
+    assert not (ROOT / "src" / "train_jh_sgkf.py").exists()
 
 
 def test_test_005_config_matches_selected_em_v30_e4_condition() -> None:

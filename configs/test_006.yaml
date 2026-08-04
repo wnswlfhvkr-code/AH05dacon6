@@ -1,5 +1,5 @@
 project:
-  experiment_name: test_002_e8a
+  experiment_name: test_006
 
 data:
   raw_dir: data/raw
@@ -7,10 +7,10 @@ data:
   submission_file: sample_submission.csv
   target_column: SUBCLASS
   id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
   e7_dir: data/processed/test_002_v08
-  # Kaggle E7 확률과 Kaggle E8 decision 배열을 함께 보관한 폴더
-  e8_dir: data/processed/test_002_v08
-  output_dir: data/processed/test_002_e8a
+  e8_dir: data/processed/test_002_v09
+  output_dir: data/processed/test_006
 
 validation:
   n_splits: 3

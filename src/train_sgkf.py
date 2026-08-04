@@ -89,11 +89,17 @@ def write_experiment_report(
     feature_min = int(fold_metrics["feature_count"].min())
     feature_max = int(fold_metrics["feature_count"].max())
     feature_mean = float(fold_metrics["feature_count"].mean())
+    train_score_mean = float(fold_metrics["train_macro_f1"].mean())
+    validation_score_mean = float(fold_metrics["validation_macro_f1"].mean())
+    gap_mean = float(fold_metrics["generalization_gap"].mean())
+    gap_max = float(fold_metrics["generalization_gap"].max())
+    overfit_fold_count = int((fold_metrics["generalization_gap"] > 0.10).sum())
     elapsed = finished_at - started_at
 
     seed_table = dataframe_to_markdown(seed_metrics)
     fold_columns = [
-        "seed", "fold", "feature_count", "macro_f1",
+        "seed", "fold", "feature_count", "train_macro_f1",
+        "validation_macro_f1", "generalization_gap",
         "converged", "elapsed_seconds",
     ]
     fold_table = dataframe_to_markdown(fold_metrics[fold_columns])
@@ -111,6 +117,11 @@ def write_experiment_report(
 | 학습 데이터 행 수 | {train_rows} |
 | Fold 피처 수 | 평균 {feature_mean:.1f}, 범위 {feature_min}~{feature_max} |
 | OOF Macro F1 | {mean_score:.6f} ± {std_score:.6f} |
+| Fold Train Macro F1 평균 | {train_score_mean:.6f} |
+| Fold Validation Macro F1 평균 | {validation_score_mean:.6f} |
+| 평균 generalization gap | {gap_mean:+.6f} |
+| 최대 generalization gap | {gap_max:+.6f} |
+| 과적합 경고 Fold (gap > 0.10) | {overfit_fold_count}/{len(fold_metrics)} |
 | 설정 파일 | `{config_path}` |
 | 제출 파일 | `{submission_path}` |
 | 요약 JSON | `{summary_path}` |
@@ -150,7 +161,7 @@ def main() -> None:
     pipeline_name = str(feature_config.get("name", ""))
     if not pipeline_name.startswith("jh_v"):
         raise ValueError(
-            "train_jh_sgkf.py는 jh_v 전처리만 지원합니다: "
+            "train_sgkf.py는 jh_v 전처리만 지원합니다: "
             f"{pipeline_name!r}"
         )
     model_name = str(config["model"].get("name", ""))
@@ -292,16 +303,25 @@ def main() -> None:
                     model.fit(train_matrix, y[train_index])
             converged = not any(issubclass(item.category, ConvergenceWarning) for item in caught)
 
+            train_score, train_score_kind = model_scores(model, train_matrix)
             valid_score, current_score_kind = model_scores(model, valid_matrix)
+            if train_score_kind != current_score_kind:
+                raise RuntimeError("Train/Validation 모델 출력 종류가 다릅니다.")
             if score_kind is None:
                 score_kind = current_score_kind
             elif score_kind != current_score_kind:
                 raise RuntimeError("폴드마다 모델 출력 종류가 다릅니다.")
+            train_prediction = model.classes_[train_score.argmax(axis=1)]
             valid_prediction = model.classes_[valid_score.argmax(axis=1)]
-            fold_score = f1_score(
+            train_fold_score = f1_score(
+                y[train_index], train_prediction,
+                labels=np.arange(n_classes), average="macro", zero_division=0,
+            )
+            validation_fold_score = f1_score(
                 y[valid_index], valid_prediction,
                 labels=np.arange(n_classes), average="macro", zero_division=0,
             )
+            generalization_gap = train_fold_score - validation_fold_score
             oof_score[valid_index] = valid_score
             oof_seen[valid_index] = True
             test_score, test_score_kind = model_scores(model, test_matrix)
@@ -316,7 +336,10 @@ def main() -> None:
                 "train_rows": len(train_index),
                 "valid_rows": len(valid_index),
                 "feature_count": train_matrix.shape[1],
-                "macro_f1": float(fold_score),
+                "macro_f1": float(validation_fold_score),
+                "train_macro_f1": float(train_fold_score),
+                "validation_macro_f1": float(validation_fold_score),
+                "generalization_gap": float(generalization_gap),
                 "converged": converged,
                 "max_n_iter": int(np.max(np.atleast_1d(getattr(
                     model,
@@ -328,7 +351,9 @@ def main() -> None:
             fold_row.update(feature_summary)
             fold_rows.append(fold_row)
             print(
-                f"seed={seed} fold={fold} Macro F1={fold_score:.6f} "
+                f"seed={seed} fold={fold} Train={train_fold_score:.6f} "
+                f"Validation={validation_fold_score:.6f} "
+                f"Gap={generalization_gap:+.6f} "
                 f"features={train_matrix.shape[1]} converged={converged}"
             )
 
@@ -379,6 +404,11 @@ def main() -> None:
     oof_predictions = pd.concat(oof_rows, ignore_index=True)
     mean_score = float(seed_metrics["oof_macro_f1"].mean())
     std_score = float(seed_metrics["oof_macro_f1"].std(ddof=1))
+    train_score_mean = float(fold_metrics["train_macro_f1"].mean())
+    validation_score_mean = float(fold_metrics["validation_macro_f1"].mean())
+    gap_mean = float(fold_metrics["generalization_gap"].mean())
+    gap_max = float(fold_metrics["generalization_gap"].max())
+    overfit_fold_count = int((fold_metrics["generalization_gap"] > 0.10).sum())
 
     test_mean_score = test_score_sum / model_count
     submission = pd.read_csv(raw_dir / data_config["submission_file"])
@@ -411,6 +441,12 @@ def main() -> None:
         "model_count": model_count,
         "oof_macro_f1_mean": mean_score,
         "oof_macro_f1_std": std_score,
+        "train_macro_f1_mean": train_score_mean,
+        "validation_macro_f1_mean": validation_score_mean,
+        "generalization_gap_mean": gap_mean,
+        "generalization_gap_max": gap_max,
+        "overfit_warning_threshold": 0.10,
+        "overfit_warning_fold_count": overfit_fold_count,
         "submission": str(submission_path),
         "feature_config": feature_config,
     }
