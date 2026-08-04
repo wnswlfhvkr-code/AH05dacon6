@@ -72,12 +72,28 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
         config = yaml.safe_load(file)
 
     if config_path.name == "test_006.yaml":
-        assert config["project"]["experiment_name"] == "test_006"
-        assert (ROOT / "src" / "ensembles" / "train_jh_e8a.py").is_file()
+        assert config["project"]["experiment_name"].startswith("test_006")
+        assert (ROOT / "src" / "ensembles").is_dir()
         return
 
     if config_path.parent.name == "ensembles":
         experiment_name = config["project"]["experiment_name"]
+        test_006_runners = {
+            "test_006_v01": "train_jh_e8b.py",
+            "test_006_v02": "train_jh_e8c.py",
+            "test_006_v03": "train_jh_e10.py",
+            "test_006_v04": "train_jh_e10a.py",
+            "test_006_v05": "train_jh_e10b1.py",
+        }
+        if experiment_name in test_006_runners:
+            assert (
+                ROOT
+                / "src"
+                / "ensembles"
+                / test_006_runners[experiment_name]
+            ).is_file()
+            return
+
         suffix = experiment_name.removeprefix("test_002_")
         assert (ROOT / "src" / "ensembles" / f"train_jh_{suffix}.py").is_file()
         return

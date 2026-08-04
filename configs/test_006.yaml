@@ -1,50 +1,37 @@
 project:
-  experiment_name: test_006
+  experiment_name: test_006_v06
+  task_type: ensemble
+  runner: jh_e10b2
 
 data:
   raw_dir: data/raw
   train_file: train.csv
+  test_file: test.csv
   submission_file: sample_submission.csv
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e7_dir: data/processed/test_002_v08
-  e8_dir: data/processed/test_002_v09
-  output_dir: data/processed/test_006
+  
+  # 실험별 입력 결과 폴더
+  # 기준 모델: test_006_v05 
+  baseline_dir: data/processed/test_006_v05
+  baseline_oof_file: oof_probabilities_by_seed.npy
+  baseline_test_file: test_probability_by_seed_fold.npy
+
+  # 추가 모델: Numeric Structural LightGBM
+  numeric_dir: data/processed/test_006_v06_numeric
+  numeric_oof_file: numeric_oof_probability_by_seed.npy
+  numeric_test_file: numeric_test_probability_by_seed_fold.npy
+    
+  # 이번 실행 결과가 저장될 곳
+  output_dir: data/processed/test_006_v06
 
 validation:
   n_splits: 3
-  seeds:
-    - 42
-    - 2026
-    - 777
-
-# 팀 공통 설정 스키마에서 E8A의 E8 기반 전처리를 명시한다.
-preprocessing:
-  name: jh_v09
+  seeds: [42, 2026, 777]
 
 ensemble:
-  temperatures:
-    - 0.25
-    - 0.40
-    - 0.60
-    - 0.80
-    - 1.00
-    - 1.25
-    - 1.50
-    - 2.00
-    - 3.00
-  e8_weights:
-    - 0.0
-    - 0.1
-    - 0.2
-    - 0.3
-    - 0.4
-    - 0.5
-    - 0.6
-    - 0.7
-    - 0.8
-    - 0.9
-    - 1.0
+  numeric_temperatures: [0.50, 0.75, 1.00, 1.25, 1.50, 2.00]
+  numeric_weights: [0.00, 0.025, 0.05, 0.075, 0.100, 0.150, 0.200]
   bootstrap_repeats: 3000
-  bootstrap_seed: 20260803
+  bootstrap_seed: 20260804

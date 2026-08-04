@@ -1,5 +1,5 @@
 project:
-  experiment_name: test_002_e8c
+  experiment_name: test_006_v01
 
 data:
   raw_dir: data/raw
@@ -12,19 +12,19 @@ data:
   e7_dir: data/processed/test_002_v08
   e8_dir: data/processed/test_002_v09
   e8a_dir: data/processed/test_006
-  em16_dir: data/processed/test_002_e8c_em16
+  em16_dir: data/processed/test_006_v01_em16
   em16_oof_files:
-    - em16_sgkf_oof_probability_by_seed.npy
+    - em16_oof_probability.npy
   em16_test_files:
-    - em16_sgkf_test_probability_by_seed_fold.npy
-  output_dir: data/processed/test_002_e8c
+    - em16_test_probability_mean.npy
+  output_dir: data/processed/test_006_v01
 
 validation:
   n_splits: 3
   seeds: [42, 2026, 777]
 
 ensemble:
-  aligned_by_seed_fold: true
+  aligned_by_seed_fold: false
   temperatures: [0.50, 0.75, 1.00, 1.25, 1.50, 2.00]
   weights: [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40]
   bootstrap_repeats: 3000

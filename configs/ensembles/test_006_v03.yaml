@@ -1,0 +1,26 @@
+project:
+  experiment_name: test_006_v03
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  e8_dir: data/processed/test_002_v09
+  e9_dir: data/processed/test_002_v10
+  output_dir: data/processed/test_006_v03
+
+validation:
+  n_splits: 3
+  seeds: [42, 2026, 777]
+
+ensemble:
+  e8_temperatures: [0.25, 0.40, 0.60, 0.80, 1.00]
+  e9_temperatures: [0.50, 1.00, 1.50, 2.00, 3.00]
+  e9_weights: [0.00, 0.05, 0.10, 0.15, 0.20]
+  bootstrap_repeats: 3000
+  bootstrap_seed: 20260805
+  require_all_seeds_improved: true

@@ -234,6 +234,7 @@ def main() -> None:
     burden_rows: list[dict] = []
     oof_rows: list[pd.DataFrame] = []
     test_score_sum = np.zeros((len(test), n_classes), dtype=np.float64)
+    test_scores_by_model: list[np.ndarray] = []
     oof_scores_by_seed: list[np.ndarray] = []
     score_kind: str | None = None
     model_count = 0
@@ -328,6 +329,7 @@ def main() -> None:
             if test_score_kind != score_kind:
                 raise RuntimeError("Validation/Test 모델 출력 종류가 다릅니다.")
             test_score_sum += test_score
+            test_scores_by_model.append(test_score.copy())
             model_count += 1
             fold_row = {
                 "seed": seed,
@@ -423,6 +425,13 @@ def main() -> None:
     score_prefix = "probability" if score_kind == "probability" else "decision"
     np.save(output_dir / f"oof_{score_prefix}_by_seed.npy", np.stack(oof_scores_by_seed))
     np.save(output_dir / f"test_{score_prefix}_mean.npy", test_mean_score)
+    test_scores_by_seed_fold = np.stack(test_scores_by_model).reshape(
+        len(seeds), n_splits, len(test), n_classes,
+    )
+    np.save(
+        output_dir / f"test_{score_prefix}_by_seed_fold.npy",
+        test_scores_by_seed_fold,
+    )
     pd.DataFrame({
         "class_index": np.arange(n_classes),
         target_column: class_names,
