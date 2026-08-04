@@ -32,6 +32,12 @@ def load_yaml(path: Path) -> dict:
         return yaml.safe_load(file)
 
 
+def _resolve_xgboost_parameters(parameters: dict) -> dict:
+    resolved = dict(parameters)
+    resolved.setdefault("device", "cuda")
+    return resolved
+
+
 def pair_right(probabilities, left, right, temperature, offset):
     left_probability = np.clip(probabilities[:, left], 1e-12, 1.0)
     right_probability = np.clip(probabilities[:, right], 1e-12, 1.0)
@@ -100,6 +106,7 @@ def train_team_pipeline(
     signature,
     output,
 ):
+    parameters = _resolve_xgboost_parameters(parameters)
     cache_path = output / f"test_004_7_{pipeline_name}_e4.npz"
     meta_path = output / f"test_004_7_{pipeline_name}_e4.json"
     if cache_path.exists() and meta_path.exists():

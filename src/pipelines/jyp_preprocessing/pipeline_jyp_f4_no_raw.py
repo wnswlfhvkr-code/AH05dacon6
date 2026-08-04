@@ -348,7 +348,16 @@ class F4NoRawPreprocessingPipeline(PreprocessingPipeline):
     name = 'jyp_f4_no_raw'
     artifact_schema_version = 4
 
-    def __init__(self, *, burden_clip_quantile: float=0.99, f3_position_min_support: int=2, f3_aa_min_support: int=2, f4_min_support: int=10, show_progress: bool=True, progress_interval: int=25000) -> None:
+    def __init__(
+        self,
+        *,
+        burden_clip_quantile: float = 0.99,
+        f3_position_min_support: int = 3,
+        f3_aa_min_support: int = 3,
+        f4_min_support: int = 5,
+        show_progress: bool = True,
+        progress_interval: int = 25000,
+    ) -> None:
         super().__init__()
         self.pipeline_name = self.name
         self.feature_blocks = ('f0', 'f1', 'f2', 'f3_position', 'f3_aa', 'f4')

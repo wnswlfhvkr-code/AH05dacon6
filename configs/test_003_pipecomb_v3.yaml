@@ -1,6 +1,6 @@
 project:
   name: AH05dacon6
-  experiment_name: test_003_pipeComb_v4_1
+  experiment_name: test_003_pipeComb_v3
   seed: 42
   python_version: "3.14"
 
@@ -29,5 +29,4 @@ training:
   metric: macro_f1
 
 preprocessing:
-  name: pipeComb_v4
-  auto_profile_groups: true
+  name: pipeComb_v3
