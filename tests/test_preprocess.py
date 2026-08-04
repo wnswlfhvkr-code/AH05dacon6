@@ -1,3 +1,4 @@
+import json
 import pickle
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 from scipy import sparse
 from sklearn.preprocessing import LabelEncoder
 
+import src.validate_preprocessing_stability as stability_validation
 from src.models.xgboost_model import create_model
 from src.pipelines.base import PreprocessingPipeline
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f8 import (
@@ -27,8 +29,22 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f11 import (
 )
 from src.pipelines.preprocessing_registry import create_preprocessing_pipeline
 from src.validate_preprocessing_stability import (
+    EM16_INTERNAL_SUMMARY_COLUMNS,
+    EM24_INTERNAL_SUMMARY_COLUMNS,
+    _align_probability_columns,
+    _blend_probabilities,
+    _build_internal_fusion_matrix,
+    _safe_output_stem,
+    _select_internal_companion_columns,
+    _select_em24_internal_columns,
     _validate_config,
+    _validate_xgb_internal_fusion_config,
+    _validate_xgb_blend_config,
+    _xgb_blend_contract_hash,
+    _xgb_internal_fusion_contract_hash,
     run_stability_validation,
+    run_xgboost_internal_fusion_validation,
+    run_xgboost_blend_validation,
 )
 
 
@@ -54,6 +70,63 @@ JYP_PIPELINES = (
     "jyp_f10",
     "jyp_f11",
 )
+
+OVERFIT_ROW_FIELDS = {
+    "train_macro_f1",
+    "validation_macro_f1",
+    "train_validation_gap",
+    "overfit_threshold",
+    "is_overfitting",
+}
+
+OVERFIT_SUMMARY_FIELDS = {
+    "mean_train_macro_f1",
+    "mean_validation_macro_f1",
+    "mean_train_validation_gap",
+    "min_train_validation_gap",
+    "max_train_validation_gap",
+    "overfit_threshold",
+    "overfit_fold_count",
+    "total_fold_count",
+    "is_overfitting",
+}
+
+
+def _assert_overfit_row(row: dict[str, object]) -> None:
+    assert OVERFIT_ROW_FIELDS <= row.keys()
+    assert row["validation_macro_f1"] == row["macro_f1"]
+    assert row["train_validation_gap"] == pytest.approx(
+        float(row["train_macro_f1"]) - float(row["validation_macro_f1"])
+    )
+    assert row["overfit_threshold"] == 0.1
+    assert row["is_overfitting"] == (row["train_validation_gap"] > 0.1)
+
+
+def _assert_overfit_summary(
+    summary: dict[str, object],
+    rows: list[dict[str, object]],
+) -> None:
+    assert OVERFIT_SUMMARY_FIELDS <= summary.keys()
+    gaps = np.asarray(
+        [float(row["train_validation_gap"]) for row in rows], dtype=np.float64
+    )
+    assert summary["mean_train_macro_f1"] == pytest.approx(
+        np.mean([float(row["train_macro_f1"]) for row in rows])
+    )
+    assert summary["mean_validation_macro_f1"] == pytest.approx(
+        np.mean([float(row["validation_macro_f1"]) for row in rows])
+    )
+    assert summary["mean_train_validation_gap"] == pytest.approx(gaps.mean())
+    assert summary["min_train_validation_gap"] == pytest.approx(gaps.min())
+    assert summary["max_train_validation_gap"] == pytest.approx(gaps.max())
+    assert summary["overfit_threshold"] == 0.1
+    assert summary["overfit_fold_count"] == sum(
+        bool(row["is_overfitting"]) for row in rows
+    )
+    assert summary["total_fold_count"] == len(rows)
+    assert summary["is_overfitting"] == (
+        summary["mean_train_validation_gap"] > 0.1
+    )
 
 
 def test_preprocessor_removes_only_constant_columns() -> None:
@@ -105,9 +178,18 @@ def test_xgboost_accepts_ordinal_encoded_features() -> None:
         seed=42,
     )
 
+    assert model.get_params()["device"] == "cuda"
     model.fit(transformed, preprocessor.encode_labels(labels))
+    booster_config = json.loads(model.get_booster().save_config())
 
     assert len(model.predict(transformed)) == len(features)
+    assert booster_config["learner"]["generic_param"]["device"] == "cuda:0"
+
+
+def test_xgboost_explicit_cpu_device_overrides_cuda_default() -> None:
+    model = create_model({"n_estimators": 1, "device": "cpu"}, seed=42)
+
+    assert model.get_params()["device"] == "cpu"
 
 
 def test_jyp_registry_uses_distinct_direct_pipeline_classes() -> None:
@@ -123,6 +205,195 @@ def test_jyp_registry_uses_distinct_direct_pipeline_classes() -> None:
     assert all(
         type(pipeline).__bases__ == (PreprocessingPipeline,)
         for pipeline in pipelines
+    )
+
+
+def test_jyp_promoted_recipes_are_code_owned_defaults() -> None:
+    common_selected_names = (
+        "jyp_f4_no_raw",
+        "jyp_f5_no_raw",
+        "jyp_f5_no_raw_missmask",
+        "jyp_f5_selective_no_raw",
+        "jyp_f6",
+        "jyp_f7",
+        "jyp_f8",
+        "jyp_f9",
+        "jyp_f10",
+        "jyp_f11",
+    )
+    pipelines = {
+        name: create_preprocessing_pipeline({"name": name})
+        for name in common_selected_names
+    }
+    for pipeline in pipelines.values():
+        assert (
+            pipeline.burden_clip_quantile,
+            pipeline.f3_position_min_support,
+            pipeline.f3_aa_min_support,
+            pipeline.f4_min_support,
+        ) == (0.99, 3, 3, 5)
+
+    for name in (
+        "jyp_f5_no_raw",
+        "jyp_f5_no_raw_missmask",
+        "jyp_f5_selective_no_raw",
+        "jyp_f8",
+    ):
+        pipeline = pipelines[name]
+        assert (
+            pipeline.f5_top_k_per_class,
+            pipeline.f5_min_gene_support,
+            pipeline.f5_laplace_alpha,
+            pipeline.f5_stability_folds,
+            pipeline.f5_min_direction_consistency,
+            pipeline.f5_min_selection_frequency,
+            pipeline.f5_random_state,
+        ) == (10, 3, 1.0, 5, 3, 2, 42)
+    assert pipelines["jyp_f5_selective_no_raw"].f5_output_rare_class_count == 10
+    assert pipelines["jyp_f8"].f5_output_rare_class_count == 10
+
+    for name in ("jyp_f7", "jyp_f8", "jyp_f9", "jyp_f10", "jyp_f11"):
+        pipeline = pipelines[name]
+        assert (
+            pipeline.f7_pairs,
+            pipeline.f7_top_k_per_direction,
+            pipeline.f7_min_gene_support,
+            pipeline.f7_laplace_alpha,
+            pipeline.f7_burden_quantiles,
+            pipeline.f7_stability_folds,
+            pipeline.f7_min_direction_consistency,
+            pipeline.f7_min_selection_frequency,
+            pipeline.f7_random_state,
+        ) == (
+            (("KIRC", "KIPAN"), ("LGG", "GBMLGG")),
+            3,
+            10,
+            4.0,
+            5,
+            5,
+            4,
+            3,
+            42,
+        )
+    assert pipelines["jyp_f9"].show_progress is False
+    assert (
+        pipelines["jyp_f6"].f6_min_document_frequency,
+        pipelines["jyp_f6"].f6_max_components,
+        pipelines["jyp_f6"].f6_random_state,
+    ) == (2, 128, 42)
+
+    pipe_comb = create_preprocessing_pipeline({"name": "pipeComb_v3"})
+    assert pipe_comb.f9_parameters == {
+        "burden_clip_quantile": 0.99,
+        "f3_position_min_support": 3,
+        "f3_aa_min_support": 3,
+        "f4_min_support": 5,
+        "f7_pairs": (("KIRC", "KIPAN"), ("LGG", "GBMLGG")),
+        "f7_top_k_per_direction": 3,
+        "f7_min_gene_support": 10,
+        "f7_laplace_alpha": 4.0,
+        "f7_burden_quantiles": 5,
+        "f7_stability_folds": 5,
+        "f7_min_direction_consistency": 4,
+        "f7_min_selection_frequency": 3,
+        "f7_random_state": 42,
+        "show_progress": True,
+        "progress_interval": 25000,
+    }
+    assert pipe_comb.em24_parameters == {
+        "min_mutation_count": 5,
+        "min_functional_mutation_count": 5,
+        "top_genes_per_class": 20,
+        "smoothing": 0.5,
+        "max_log2_odds": 8.0,
+        "shrinkage": 10.0,
+        "min_hotspot_count": 5,
+        "max_hotspots": 384,
+        "inner_signature_folds": 5,
+        "signature_random_state": 42,
+    }
+
+
+def test_pipe_comb_v3_adds_only_em24_dual_signatures_after_f9() -> None:
+    classes = ["KIRC", "KIPAN", "LGG", "GBMLGG"]
+    genes = ["GENE_A", "GENE_B", "GENE_C", "GENE_D", "PASSENGER"]
+    rows: list[dict[str, str]] = []
+    label_values: list[str] = []
+    for class_index, class_name in enumerate(classes):
+        for sample_index in range(8):
+            row = {gene: "WT" for gene in genes}
+            row[genes[class_index]] = f"A{class_index + 1}V"
+            if sample_index % 2 == 0:
+                row["PASSENGER"] = "R9Q"
+            rows.append(row)
+            label_values.append(class_name)
+
+    features = pd.DataFrame(rows)
+    labels = pd.Series(label_values, index=features.index)
+    pipeline = create_preprocessing_pipeline({
+        "name": "pipeComb_v3",
+        "f3_position_min_support": 1,
+        "f3_aa_min_support": 1,
+        "f4_min_support": 1,
+        "f7_top_k_per_direction": 1,
+        "f7_min_gene_support": 1,
+        "f7_stability_folds": 4,
+        "f7_min_direction_consistency": 4,
+        "f7_min_selection_frequency": 3,
+        "em24_min_mutation_count": 1,
+        "em24_min_functional_mutation_count": 1,
+        "em24_top_genes_per_class": 2,
+        "em24_min_hotspot_count": 1,
+        "em24_inner_signature_folds": 4,
+        "show_progress": False,
+    })
+
+    train_matrix = pipeline.fit_transform(features, labels)
+    full_fit_train_matrix = pipeline.transform(features)
+    test_matrix = pipeline.transform(features.iloc[:4])
+    feature_names = pipeline.get_feature_names_out().astype(str).tolist()
+    em24_names = [name for name in feature_names if name.startswith("EM24__")]
+
+    assert type(pipeline).__bases__ == (PreprocessingPipeline,)
+    assert sparse.isspmatrix_csr(train_matrix)
+    assert train_matrix.dtype == np.float32
+    assert train_matrix.shape[1] == test_matrix.shape[1] == len(feature_names)
+    assert len(em24_names) == 4 * len(classes)
+    assert all(
+        name.startswith("EM24__signature_all_")
+        or name.startswith("EM24__signature_functional_")
+        for name in em24_names
+    )
+    assert feature_names[-len(em24_names):] == em24_names
+    assert pipeline.summary()["em24_dual_signature_features"] == 16
+    assert not np.allclose(
+        train_matrix[:, -len(em24_names):].toarray(),
+        full_fit_train_matrix[:, -len(em24_names):].toarray(),
+    )
+
+    reference_f9 = create_preprocessing_pipeline({
+        "name": "jyp_f9",
+        **pipeline.f9_parameters,
+    })
+    reference_em24 = create_preprocessing_pipeline({
+        "name": "em_v24",
+        **pipeline.em24_parameters,
+    })
+    reference_matrix, reference_suffix_names = _build_internal_fusion_matrix(
+        reference_f9.fit_transform(features, labels),
+        reference_em24.fit_transform(features, labels),
+        ["signature_all", "signature_functional"],
+    )
+    np.testing.assert_allclose(train_matrix.toarray(), reference_matrix.toarray())
+    assert feature_names == [
+        *reference_f9.get_feature_names_out().astype(str).tolist(),
+        *reference_suffix_names,
+    ]
+
+    restored = pickle.loads(pickle.dumps(pipeline))
+    np.testing.assert_allclose(
+        restored.transform(features.iloc[:4]).toarray(),
+        test_matrix.toarray(),
     )
 
 
@@ -527,6 +798,8 @@ def test_jyp_f5_uses_oof_only_in_fit_transform(pipeline_name: str) -> None:
         "f5_min_selection_frequency": 3,
         "show_progress": False,
     }
+    if pipeline_name == "jyp_f5_selective_no_raw":
+        config["f5_output_rare_class_count"] = None
 
     pipeline = create_preprocessing_pipeline(config)
     oof_matrix = pipeline.fit_transform(features, labels)
@@ -841,6 +1114,24 @@ def test_stability_validator_accepts_standalone_config_without_reference() -> No
     assert n_splits == 5
 
 
+@pytest.mark.parametrize("threshold", [True, -0.01, float("inf"), "invalid"])
+def test_stability_validator_rejects_invalid_overfit_threshold(
+    threshold: object,
+) -> None:
+    config = {
+        "model": {"name": "xgboost", "n_estimators": 1},
+        "preprocessing": {"name": "baseline"},
+        "stability_validation": {
+            "seeds": [42],
+            "n_splits": 2,
+            "overfit_threshold": threshold,
+        },
+    }
+
+    with pytest.raises(ValueError, match="overfit_threshold"):
+        _validate_config(config)
+
+
 def test_stability_validator_runs_standalone_without_promotion_rule(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -898,4 +1189,674 @@ def test_stability_validator_runs_standalone_without_promotion_rule(
     assert result["summary"]["stability_reference"] is None
     assert result["summary"]["promotion_passed"] is None
     assert result["summary"]["decision"] == "standalone_validation"
-    assert (processed_dir / "standalone_3seed_test.json").is_file()
+    assert len(result["fold_results"]) == 2
+    for row in result["fold_results"]:
+        _assert_overfit_row(row)
+    _assert_overfit_summary(result["summary"], result["fold_results"])
+
+    result_path = processed_dir / "standalone_3seed_test.json"
+    fold_path = tmp_path / result["artifacts"]["fold_csv"]
+    persisted = json.loads(result_path.read_text(encoding="utf-8"))
+    persisted_fold_rows = pd.read_csv(fold_path).to_dict("records")
+    assert result_path.is_file()
+    assert OVERFIT_SUMMARY_FIELDS <= persisted["summary"].keys()
+    assert OVERFIT_ROW_FIELDS <= persisted["fold_results"][0].keys()
+    assert OVERFIT_ROW_FIELDS <= persisted_fold_rows[0].keys()
+
+
+def test_xgb_blend_aligns_probability_columns_to_original_labels() -> None:
+    class ReversedModel:
+        classes_ = np.asarray([1, 0])
+
+    class Decoder:
+        def decode_labels(self, labels):
+            return np.asarray(["A", "B"])[np.asarray(labels, dtype=int)]
+
+    aligned = _align_probability_columns(
+        np.asarray([[0.3, 0.7]]),
+        model=ReversedModel(),
+        preprocessor=Decoder(),
+        global_class_labels=np.asarray(["A", "B"]),
+        context="test",
+    )
+
+    np.testing.assert_allclose(aligned, np.asarray([[0.7, 0.3]]))
+    with pytest.raises(RuntimeError, match="SUBCLASS 집합"):
+        _align_probability_columns(
+            np.asarray([[1.0]]),
+            model=type("OneClassModel", (), {"classes_": np.asarray([0])})(),
+            preprocessor=Decoder(),
+            global_class_labels=np.asarray(["A", "B"]),
+            context="missing class",
+        )
+
+
+def test_xgb_blend_applies_configured_convex_weights() -> None:
+    combined = _blend_probabilities(
+        {"jyp_f9": 0.6, "em_v24": 0.4},
+        {
+            "jyp_f9": np.asarray([[0.9, 0.1], [0.2, 0.8]]),
+            "em_v24": np.asarray([[0.7, 0.3], [0.4, 0.6]]),
+        },
+        context="test blend",
+    )
+
+    np.testing.assert_allclose(
+        combined,
+        np.asarray([[0.82, 0.18], [0.28, 0.72]]),
+        rtol=0.0,
+        atol=1e-7,
+    )
+
+
+@pytest.mark.parametrize("stem", ["../escape", "nested/output", "nested\\output", "bad name"])
+def test_xgb_blend_rejects_unsafe_output_stems(stem: str) -> None:
+    with pytest.raises(ValueError, match="단일 파일명"):
+        _safe_output_stem(stem)
+
+
+def test_xgb_blend_contract_ignores_resume_and_progress_flags() -> None:
+    base = {
+        "project": {"experiment_name": "blend"},
+        "data": {"train_file": "train.csv"},
+        "model": {"name": "xgboost"},
+        "xgb_blend_validation": {
+            "seeds": [42],
+            "n_splits": 5,
+            "resume": True,
+            "show_progress": True,
+        },
+    }
+    changed = {
+        **base,
+        "xgb_blend_validation": {
+            **base["xgb_blend_validation"],
+            "resume": False,
+            "show_progress": False,
+        },
+    }
+
+    first = _xgb_blend_contract_hash(
+        base,
+        data_hashes={},
+        source_hashes={},
+        runtime_versions={},
+    )
+    second = _xgb_blend_contract_hash(
+        changed,
+        data_hashes={},
+        source_hashes={},
+        runtime_versions={},
+    )
+
+    assert first == second
+
+
+@pytest.mark.parametrize(
+    "weights",
+    [
+        {"left": 0.8, "right": 0.3},
+        {"left": 1.0, "right": 0.0},
+        {"left": 1.1, "right": -0.1},
+    ],
+)
+def test_xgb_blend_rejects_invalid_candidate_weights(
+    weights: dict[str, float],
+) -> None:
+    config = {
+        "model": {"name": "xgboost", "n_estimators": 1},
+        "xgb_blend_validation": {
+            "seeds": [42],
+            "n_splits": 2,
+            "members": {
+                "left": {"name": "baseline"},
+                "right": {"name": "baseline"},
+            },
+            "baseline_member": "left",
+            "candidates": {"candidate": {"weights": weights}},
+        },
+    }
+
+    with pytest.raises(ValueError, match="가중치"):
+        _validate_xgb_blend_config(config)
+
+
+@pytest.mark.parametrize("threshold", [True, -0.01, float("inf"), "invalid"])
+def test_xgb_blend_rejects_invalid_overfit_threshold(threshold: object) -> None:
+    config = {
+        "model": {"name": "xgboost", "n_estimators": 1},
+        "xgb_blend_validation": {
+            "seeds": [42],
+            "n_splits": 2,
+            "overfit_threshold": threshold,
+            "members": {
+                "left": {"name": "baseline"},
+                "right": {"name": "baseline"},
+            },
+            "baseline_member": "left",
+            "candidates": {
+                "candidate": {"weights": {"left": 0.5, "right": 0.5}}
+            },
+        },
+    }
+
+    with pytest.raises(ValueError, match="overfit_threshold"):
+        _validate_xgb_blend_config(config)
+
+
+def test_xgb_blend_fits_each_member_once_per_fold(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    train = pd.DataFrame({
+        "ID": [f"TRAIN_{index}" for index in range(8)],
+        "SUBCLASS": ["A"] * 4 + ["B"] * 4,
+        "signal": [0.0] * 4 + [1.0] * 4,
+    })
+    test = pd.DataFrame({
+        "ID": ["TEST_0", "TEST_1"],
+        "signal": [0.0, 1.0],
+    })
+    submission = pd.DataFrame({
+        "ID": test["ID"],
+        "SUBCLASS": ["A", "A"],
+    })
+    train.to_csv(tmp_path / "train.csv", index=False)
+    test.to_csv(tmp_path / "test.csv", index=False)
+    submission.to_csv(tmp_path / "sample_submission.csv", index=False)
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    stale_submission = processed_dir / "blend_smoke_old_submission.csv"
+    stale_submission.write_text("stale", encoding="utf-8")
+
+    fit_calls: list[str] = []
+
+    class RecordingPipeline:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.encoder = LabelEncoder()
+
+        def fit_transform(self, frame: pd.DataFrame, labels: pd.Series):
+            fit_calls.append(self.name)
+            self.encoder.fit(labels)
+            return frame[["signal"]].astype("float32")
+
+        def transform(self, frame: pd.DataFrame):
+            return frame[["signal"]].astype("float32")
+
+        def encode_labels(self, labels: pd.Series):
+            return self.encoder.transform(labels)
+
+        def decode_labels(self, labels):
+            return self.encoder.inverse_transform(np.asarray(labels, dtype=int))
+
+    class FixedModel:
+        def fit(self, features, labels):
+            self.classes_ = np.unique(labels)
+            return self
+
+        def predict_proba(self, features):
+            signal = np.asarray(features)[:, 0]
+            right = np.where(signal > 0.5, 0.8, 0.2)
+            return np.column_stack([1.0 - right, right])
+
+    def create_recording_pipeline(config: dict[str, object]):
+        return RecordingPipeline(str(config["name"]))
+
+    monkeypatch.setattr(
+        stability_validation,
+        "create_preprocessing_pipeline",
+        create_recording_pipeline,
+    )
+    monkeypatch.setitem(
+        stability_validation.MODEL_BUILDERS,
+        "xgboost",
+        lambda _config, _seed: FixedModel(),
+    )
+    monkeypatch.setattr(
+        stability_validation,
+        "_blend_implementation_identity",
+        lambda **_: ({}, {}),
+    )
+
+    members = {
+        "jyp_f9": {"name": "jyp_f9"},
+        "em_v24": {"name": "em_v24"},
+        "em_v20": {"name": "em_v20"},
+        "em_v19": {"name": "em_v19"},
+    }
+    config = {
+        "project": {"experiment_name": "blend_smoke"},
+        "data": {
+            "raw_dir": ".",
+            "processed_dir": "processed",
+            "train_file": "train.csv",
+            "test_file": "test.csv",
+            "submission_file": "sample_submission.csv",
+            "target_column": "SUBCLASS",
+            "id_column": "ID",
+        },
+        "model": {"name": "xgboost", "n_estimators": 1},
+        "xgb_blend_validation": {
+            "seeds": [42],
+            "n_splits": 2,
+            "show_progress": False,
+            "resume": True,
+            "submission_policy": "screening_only",
+            "baseline_member": "jyp_f9",
+            "members": members,
+            "candidates": {
+                "jypF9_EM24": {"weights": {"jyp_f9": 0.6, "em_v24": 0.4}},
+                "jypF9_EM20": {"weights": {"jyp_f9": 0.65, "em_v20": 0.35}},
+                "jypF9_EM19": {"weights": {"jyp_f9": 0.65, "em_v19": 0.35}},
+            },
+        },
+    }
+
+    result = run_xgboost_blend_validation(
+        config,
+        project_root=tmp_path,
+        force=True,
+        quiet=True,
+    )
+
+    assert result["training_count"] == 8
+    assert {name: fit_calls.count(name) for name in members} == {
+        name: 2 for name in members
+    }
+    assert result["summary"]["baseline_mean_seed_oof_macro_f1"] == 1.0
+    assert set(result["summary"]["candidates"]) == {
+        "jypF9_EM24",
+        "jypF9_EM20",
+        "jypF9_EM19",
+    }
+    scores_path = tmp_path / result["artifacts"]["scores_csv"]
+    score_rows = pd.read_csv(scores_path).to_dict("records")
+    assert score_rows
+    for row in score_rows:
+        _assert_overfit_row(row)
+    rows_by_name = {
+        name: [row for row in score_rows if row["name"] == name]
+        for name in result["summary"]["candidates"]
+    }
+    for name, summary in result["summary"]["candidates"].items():
+        _assert_overfit_summary(summary, rows_by_name[name])
+
+    result_path = tmp_path / result["artifacts"]["result_json"]
+    persisted = json.loads(result_path.read_text(encoding="utf-8"))
+    assert OVERFIT_SUMMARY_FIELDS <= persisted["summary"]["candidates"][
+        "jypF9_EM24"
+    ].keys()
+    assert OVERFIT_ROW_FIELDS <= set(pd.read_csv(scores_path).columns)
+    assert (tmp_path / "processed" / "blend_smoke_probabilities.npz").is_file()
+    assert not list((tmp_path / "processed").glob("*_submission.csv"))
+
+    completed_fit_count = len(fit_calls)
+    repeated = run_xgboost_blend_validation(
+        config,
+        project_root=tmp_path,
+        quiet=True,
+    )
+    assert repeated["status"] == "complete"
+    assert len(fit_calls) == completed_fit_count
+
+
+def _internal_fusion_config() -> dict[str, object]:
+    return {
+        "project": {"experiment_name": "internal_fusion_smoke"},
+        "data": {
+            "raw_dir": ".",
+            "processed_dir": "processed",
+            "train_file": "train.csv",
+            "test_file": "test.csv",
+            "submission_file": "sample_submission.csv",
+            "target_column": "SUBCLASS",
+            "id_column": "ID",
+        },
+        "model": {"name": "xgboost", "n_estimators": 1},
+        "xgb_internal_fusion_validation": {
+            "seeds": [42],
+            "n_splits": 2,
+            "show_progress": False,
+            "resume": True,
+            "submission_policy": "screening_only",
+            "baseline_candidate": "f9",
+            "f9_preprocessing": {"name": "jyp_f9"},
+            "em24_preprocessing": {"name": "em_v24"},
+            "candidates": {
+                "f9": {"em24_blocks": []},
+                "summary": {"em24_blocks": ["summary"]},
+                "dual_signature": {
+                    "em24_blocks": ["signature_all", "signature_functional"]
+                },
+                "both": {
+                    "em24_blocks": [
+                        "summary",
+                        "signature_all",
+                        "signature_functional",
+                    ]
+                },
+            },
+        },
+    }
+
+
+def test_internal_fusion_selects_approved_em24_blocks_in_canonical_order() -> None:
+    columns = [
+        "signature_functional_B_mean",
+        "unused_gene_severity",
+        *reversed(EM24_INTERNAL_SUMMARY_COLUMNS),
+        "signature_all_B_sum",
+        "signature_all_A_sum",
+        "signature_functional_A_mean",
+    ]
+    frame = pd.DataFrame(np.zeros((2, len(columns))), columns=columns)
+
+    selected = _select_em24_internal_columns(
+        frame,
+        ["signature_functional", "summary", "signature_all"],
+    )
+
+    assert selected[:16] == list(EM24_INTERNAL_SUMMARY_COLUMNS)
+    assert selected[16:18] == ["signature_all_B_sum", "signature_all_A_sum"]
+    assert selected[18:] == [
+        "signature_functional_B_mean",
+        "signature_functional_A_mean",
+    ]
+
+
+def test_internal_fusion_preserves_f9_csr_prefix_shape_dtype_and_names() -> None:
+    f9 = sparse.csr_matrix(
+        np.asarray([[0.0, 2.0], [3.0, 0.0]], dtype=np.float64)
+    )
+    em24 = pd.DataFrame(
+        {
+            **{
+                name: np.asarray([index, index + 1], dtype=np.float64)
+                for index, name in enumerate(EM24_INTERNAL_SUMMARY_COLUMNS)
+            },
+            "signature_all_A_sum": [0.25, 0.5],
+            "signature_all_B_sum": [0.75, 1.0],
+            "signature_functional_A_mean": [1.25, 1.5],
+            "signature_functional_B_mean": [1.75, 2.0],
+        }
+    )
+
+    combined, suffix_names = _build_internal_fusion_matrix(
+        f9,
+        em24,
+        ["summary", "signature_all", "signature_functional"],
+    )
+
+    assert sparse.isspmatrix_csr(combined)
+    assert combined.dtype == np.float32
+    assert combined.shape == (2, 22)
+    np.testing.assert_array_equal(combined[:, :2].toarray(), f9.toarray())
+    assert len(suffix_names) == 20
+    assert suffix_names == [
+        *(f"EM24__{name}" for name in EM24_INTERNAL_SUMMARY_COLUMNS),
+        "EM24__signature_all_A_sum",
+        "EM24__signature_all_B_sum",
+        "EM24__signature_functional_A_mean",
+        "EM24__signature_functional_B_mean",
+    ]
+
+
+def test_internal_fusion_selects_and_names_em16_blocks() -> None:
+    columns = [
+        "GENE_A",
+        "GENE_B",
+        *EM16_INTERNAL_SUMMARY_COLUMNS,
+        "signature_A_weighted",
+        "signature_A_match_count",
+        "hotspot_0000",
+    ]
+    em16 = pd.DataFrame(np.ones((2, len(columns))), columns=columns)
+    selected = _select_internal_companion_columns(
+        em16,
+        ["hotspot", "signature", "summary", "severity"],
+        companion_name="em_v16",
+    )
+
+    assert selected == columns
+    combined, suffix_names = _build_internal_fusion_matrix(
+        sparse.csr_matrix(np.zeros((2, 1), dtype=np.float32)),
+        em16,
+        ["severity", "signature"],
+        companion_name="em_v16",
+    )
+    assert combined.shape == (2, 5)
+    assert suffix_names == [
+        "EM16__GENE_A",
+        "EM16__GENE_B",
+        "EM16__signature_A_weighted",
+        "EM16__signature_A_match_count",
+    ]
+
+
+def test_internal_fusion_rejects_unsupported_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _internal_fusion_config()
+    config["xgb_internal_fusion_validation"]["candidates"]["both"] = {
+        "em24_blocks": ["severity"]
+    }
+    monkeypatch.setattr(
+        stability_validation,
+        "create_preprocessing_pipeline",
+        lambda _config: object(),
+    )
+    monkeypatch.setitem(
+        stability_validation.MODEL_BUILDERS,
+        "xgboost",
+        lambda _config, _seed: object(),
+    )
+
+    with pytest.raises(ValueError, match="지원하지 않는 블록"):
+        _validate_xgb_internal_fusion_config(config)
+
+
+def test_internal_fusion_rejects_baseline_only_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _internal_fusion_config()
+    config["xgb_internal_fusion_validation"]["candidates"] = {
+        "f9": {"em24_blocks": []}
+    }
+    monkeypatch.setattr(
+        stability_validation,
+        "create_preprocessing_pipeline",
+        lambda _config: object(),
+    )
+    monkeypatch.setitem(
+        stability_validation.MODEL_BUILDERS,
+        "xgboost",
+        lambda _config, _seed: object(),
+    )
+
+    with pytest.raises(ValueError, match="비교 후보"):
+        _validate_xgb_internal_fusion_config(config)
+
+
+@pytest.mark.parametrize("threshold", [True, -0.01, float("inf"), "invalid"])
+def test_internal_fusion_rejects_invalid_overfit_threshold(
+    threshold: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _internal_fusion_config()
+    config["xgb_internal_fusion_validation"]["overfit_threshold"] = threshold
+    monkeypatch.setattr(
+        stability_validation,
+        "create_preprocessing_pipeline",
+        lambda _config: object(),
+    )
+    monkeypatch.setitem(
+        stability_validation.MODEL_BUILDERS,
+        "xgboost",
+        lambda _config, _seed: object(),
+    )
+
+    with pytest.raises(ValueError, match="overfit_threshold"):
+        _validate_xgb_internal_fusion_config(config)
+
+
+def test_internal_fusion_contract_ignores_resume_and_progress_flags() -> None:
+    base = _internal_fusion_config()
+    changed = {
+        **base,
+        "xgb_internal_fusion_validation": {
+            **base["xgb_internal_fusion_validation"],
+            "resume": False,
+            "show_progress": True,
+        },
+    }
+
+    first = _xgb_internal_fusion_contract_hash(
+        base,
+        data_hashes={},
+        source_hashes={},
+        runtime_versions={},
+    )
+    second = _xgb_internal_fusion_contract_hash(
+        changed,
+        data_hashes={},
+        source_hashes={},
+        runtime_versions={},
+    )
+
+    assert first == second
+
+
+def test_internal_fusion_reuses_preprocessing_per_fold_and_resumes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    train = pd.DataFrame({
+        "ID": [f"TRAIN_{index}" for index in range(8)],
+        "SUBCLASS": ["A"] * 4 + ["B"] * 4,
+        "signal": [0.0] * 4 + [1.0] * 4,
+    })
+    test = pd.DataFrame({
+        "ID": ["TEST_0", "TEST_1"],
+        "signal": [0.0, 1.0],
+    })
+    submission = pd.DataFrame({"ID": test["ID"], "SUBCLASS": ["A", "A"]})
+    train.to_csv(tmp_path / "train.csv", index=False)
+    test.to_csv(tmp_path / "test.csv", index=False)
+    submission.to_csv(tmp_path / "sample_submission.csv", index=False)
+
+    fit_calls: list[str] = []
+    model_feature_counts: list[int] = []
+
+    class RecordingPipeline:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.label_encoder = LabelEncoder()
+
+        def fit_transform(self, frame: pd.DataFrame, labels: pd.Series):
+            fit_calls.append(self.name)
+            self.label_encoder.fit(labels)
+            return self.transform(frame)
+
+        def transform(self, frame: pd.DataFrame):
+            if self.name == "jyp_f9":
+                return sparse.csr_matrix(
+                    frame[["signal"]].to_numpy(dtype=np.float32)
+                )
+            values: dict[str, np.ndarray] = {
+                name: np.zeros(len(frame), dtype=np.float32)
+                for name in EM24_INTERNAL_SUMMARY_COLUMNS
+            }
+            signal = frame["signal"].to_numpy(dtype=np.float32)
+            values.update({
+                "signature_all_A_sum": 1.0 - signal,
+                "signature_all_B_sum": signal,
+                "signature_functional_A_mean": 1.0 - signal,
+                "signature_functional_B_mean": signal,
+                "unused_gene_severity": signal,
+            })
+            return pd.DataFrame(values, index=frame.index)
+
+        def get_feature_names_out(self):
+            return np.asarray(["F9__signal"], dtype=object)
+
+        def encode_labels(self, labels: pd.Series):
+            return self.label_encoder.transform(labels)
+
+        def decode_labels(self, labels):
+            return self.label_encoder.inverse_transform(np.asarray(labels, dtype=int))
+
+    class RecordingModel:
+        def fit(self, features, labels):
+            self.classes_ = np.unique(labels)
+            model_feature_counts.append(features.shape[1])
+            return self
+
+        def predict_proba(self, features):
+            signal = sparse.csr_matrix(features)[:, 0].toarray().ravel()
+            right = np.where(signal > 0.5, 0.8, 0.2)
+            return np.column_stack([1.0 - right, right])
+
+    monkeypatch.setattr(
+        stability_validation,
+        "create_preprocessing_pipeline",
+        lambda config: RecordingPipeline(str(config["name"])),
+    )
+    monkeypatch.setitem(
+        stability_validation.MODEL_BUILDERS,
+        "xgboost",
+        lambda _config, _seed: RecordingModel(),
+    )
+    monkeypatch.setattr(
+        stability_validation,
+        "_blend_implementation_identity",
+        lambda **_: ({}, {}),
+    )
+
+    config = _internal_fusion_config()
+    result = run_xgboost_internal_fusion_validation(
+        config,
+        project_root=tmp_path,
+        force=True,
+        quiet=True,
+    )
+
+    assert result["training_count"] == 8
+    assert result["preprocessing_fit_count"] == 4
+    assert fit_calls.count("jyp_f9") == 2
+    assert fit_calls.count("em_v24") == 2
+    assert model_feature_counts == [1, 17, 5, 21] * 2
+    assert result["summary"]["baseline_mean_seed_oof_macro_f1"] == 1.0
+    assert result["summary"]["best_candidate"] == "f9"
+    assert result["summary"]["best_nonbaseline_candidate"] == "summary"
+    assert result["summary"]["promotion_candidate"] is None
+    scores_path = tmp_path / result["artifacts"]["scores_csv"]
+    score_rows = pd.read_csv(scores_path).to_dict("records")
+    assert score_rows
+    for row in score_rows:
+        _assert_overfit_row(row)
+    rows_by_name = {
+        name: [row for row in score_rows if row["name"] == name]
+        for name in result["summary"]["candidates"]
+    }
+    for name, summary in result["summary"]["candidates"].items():
+        _assert_overfit_summary(summary, rows_by_name[name])
+
+    result_path = tmp_path / result["artifacts"]["result_json"]
+    persisted = json.loads(result_path.read_text(encoding="utf-8"))
+    assert OVERFIT_SUMMARY_FIELDS <= persisted["summary"]["candidates"][
+        "summary"
+    ].keys()
+    assert OVERFIT_ROW_FIELDS <= set(pd.read_csv(scores_path).columns)
+    assert not list((tmp_path / "processed").glob("*_submission.csv"))
+
+    completed_fit_calls = len(fit_calls)
+    completed_model_fits = len(model_feature_counts)
+    repeated = run_xgboost_internal_fusion_validation(
+        config,
+        project_root=tmp_path,
+        quiet=True,
+    )
+    assert repeated["status"] == "complete"
+    assert len(fit_calls) == completed_fit_calls
+    assert len(model_feature_counts) == completed_model_fits

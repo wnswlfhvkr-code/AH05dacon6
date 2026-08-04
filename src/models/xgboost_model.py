@@ -13,4 +13,5 @@ def create_model(model_config: dict, seed: int) -> XGBClassifier:
     parameters["random_state"] = seed
     parameters.setdefault("eval_metric", "mlogloss")
     parameters.setdefault("tree_method", "hist")
+    parameters.setdefault("device", "cuda")
     return XGBClassifier(**parameters)

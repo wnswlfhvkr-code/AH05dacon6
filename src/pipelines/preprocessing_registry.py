@@ -80,6 +80,12 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f10 import (
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f11 import (
     F11AutoConfusionPairNoRawPreprocessingPipeline,
 )
+from src.pipelines.jyp_preprocessing.pipeline_pipe_comb_v3 import (
+    PipeCombV3PreprocessingPipeline,
+)
+from src.pipelines.jyp_preprocessing.pipeline_pipe_comb_v4 import (
+    PipeCombV4PreprocessingPipeline,
+)
 from src.pipelines.jyp_preprocessing.pipeline_jyp_raw import RawPreprocessingPipeline
 from src.pipelines.pipeline_jh_v01 import JHV01PreprocessingPipeline
 from src.pipelines.pipeline_jh_v02 import JHV02PreprocessingPipeline
@@ -166,6 +172,8 @@ PIPELINES = {
     "jyp_f9": F9GlobalAAPairNoRawPreprocessingPipeline,
     "jyp_f10": F10GlobalAACompositionNoRawPreprocessingPipeline,
     "jyp_f11": F11AutoConfusionPairNoRawPreprocessingPipeline,
+    "pipeComb_v3": PipeCombV3PreprocessingPipeline,
+    "pipeComb_v4": PipeCombV4PreprocessingPipeline,
     "jh_v01": JHV01PreprocessingPipeline,
     "jh_v02": JHV02PreprocessingPipeline,
     "jh_v03": JHV03PreprocessingPipeline,

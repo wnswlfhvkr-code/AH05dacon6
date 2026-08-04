@@ -24,30 +24,15 @@ model:
   n_jobs: -1
   eval_metric: mlogloss
   tree_method: hist
+  device: cuda
 
 preprocessing:
   name: jyp_f9
-  burden_clip_quantile: 0.99
-  f3_position_min_support: 3
-  f3_aa_min_support: 3
-  f4_min_support: 5
-  f7_pairs:
-    - [KIRC, KIPAN]
-    - [LGG, GBMLGG]
-  f7_top_k_per_direction: 3
-  f7_min_gene_support: 10
-  f7_laplace_alpha: 4.0
-  f7_burden_quantiles: 5
-  f7_stability_folds: 5
-  f7_min_direction_consistency: 4
-  f7_min_selection_frequency: 3
-  f7_random_state: 42
-  show_progress: false
-  progress_interval: 25000
 
 stability_validation:
   seeds: [101, 2027, 7301]
   n_splits: 5
   metric: macro_f1
+  overfit_threshold: 0.1
   show_progress: true
   resume: true

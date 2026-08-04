@@ -822,7 +822,33 @@ class F11AutoConfusionPairNoRawPreprocessingPipeline(PreprocessingPipeline):
     name = 'jyp_f11'
     artifact_schema_version = 7
 
-    def __init__(self, *, burden_clip_quantile: float=0.99, f3_position_min_support: int=2, f3_aa_min_support: int=2, f4_min_support: int=10, f7_pairs: Sequence[Sequence[str]]=(('KIRC', 'KIPAN'), ('LGG', 'GBMLGG')), f7_top_k_per_direction: int=5, f7_min_gene_support: int=10, f7_laplace_alpha: float=4.0, f7_burden_quantiles: int=5, f7_stability_folds: int=5, f7_min_direction_consistency: int=4, f7_min_selection_frequency: int=3, f7_random_state: int=42, f11_auto_pair_count: int=6, f11_discovery_folds: int=3, f11_discovery_c: float=0.07, f11_discovery_max_iter: int=500, f11_random_state: int=42, show_progress: bool=True, progress_interval: int=25000) -> None:
+    def __init__(
+        self,
+        *,
+        burden_clip_quantile: float = 0.99,
+        f3_position_min_support: int = 3,
+        f3_aa_min_support: int = 3,
+        f4_min_support: int = 5,
+        f7_pairs: Sequence[Sequence[str]] = (
+            ('KIRC', 'KIPAN'),
+            ('LGG', 'GBMLGG'),
+        ),
+        f7_top_k_per_direction: int = 3,
+        f7_min_gene_support: int = 10,
+        f7_laplace_alpha: float = 4.0,
+        f7_burden_quantiles: int = 5,
+        f7_stability_folds: int = 5,
+        f7_min_direction_consistency: int = 4,
+        f7_min_selection_frequency: int = 3,
+        f7_random_state: int = 42,
+        f11_auto_pair_count: int = 6,
+        f11_discovery_folds: int = 3,
+        f11_discovery_c: float = 0.07,
+        f11_discovery_max_iter: int = 500,
+        f11_random_state: int = 42,
+        show_progress: bool = True,
+        progress_interval: int = 25000,
+    ) -> None:
         super().__init__()
         self.pipeline_name = self.name
         self.feature_blocks = ('f0', 'f1', 'f2', 'f3_position', 'f3_aa', 'f4', 'f7_paircontrast', 'f9_global_aa_pair_log1p', 'f11_auto_confusion_paircontrast')

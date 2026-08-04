@@ -32,6 +32,7 @@ model:
     early_stopping_rounds: 30
     eval_metric: mlogloss
     tree_method: hist
+    device: cuda
   pair_experts:
     temperature: 1.75
     KIRC_KIPAN:

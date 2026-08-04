@@ -39,6 +39,10 @@ python -m src.train --config configs/baseline.yaml
 현재 등록된 모델은 `xgboost`, `lightgbm`, `linear_svc`,
 `wc_tfidf_lsvc_lgbm`입니다. 정세준 실험은 `test_004.yaml`에서 관리합니다.
 
+모든 XGBoost 실행은 `device: cuda`를 명시하며, 중앙 모델 팩토리도 CUDA를
+기본값으로 사용합니다. CPU 실행이 꼭 필요한 예외만 설정에서 `device: cpu`로
+명시적으로 덮어씁니다.
+
 ```bash
 python -m src.train --config configs/test_004.yaml
 ```
@@ -71,15 +75,30 @@ python -m src.data_quality --config configs/baseline.yaml
 
 ### JYP test_003
 
-`configs/test_003.yaml`은 모델 `xgboost`와 전처리
-`jyp_f7`을 사용합니다. JYP 전처리 16개는
-`src/pipelines/jyp_preprocessing/`의 독립 파이프라인 파일로 구성되며,
-설정의 `preprocessing.name`으로 선택합니다.
+`configs/test_003.yaml`은 모델 `xgboost`와 최종 전처리
+`pipeComb_v4`를 사용합니다. JYP 전처리는
+`src/pipelines/jyp_preprocessing/`에 구성되며 설정의
+`preprocessing.name`으로 선택합니다. 단계별 JYP 파이프라인은 서로 독립이고,
+보존하는 결합 파이프라인은 `pipeComb_v3`, `pipeComb_v4` 두 개입니다.
 
 - `jyp_raw`, `jyp_f0`, `jyp_f0_no_raw`, `jyp_f1`, `jyp_f2`
 - `jyp_f3_position`, `jyp_f3`, `jyp_f3_no_raw`, `jyp_f4`, `jyp_f4_no_raw`
 - `jyp_f5`, `jyp_f5_no_raw`, `jyp_f5_no_raw_missmask`, `jyp_f5_selective_no_raw`
-- `jyp_f6`, `jyp_f7`
+- `jyp_f6`, `jyp_f7`, `jyp_f8`, `jyp_f9`, `jyp_f10`, `jyp_f11`
+- `pipeComb_v3`: `jyp_f9` + EM24 전체·기능 변이 dual signature 104개
+- `pipeComb_v4`: `jyp_f9` + EM24 전체·기능 변이 weighted signature 52개
+
+`pipeComb_v3`는 weighted와 match-count를 모두 보존한 D104 결과이고,
+`pipeComb_v4`는 두 채널의 weighted만 남긴 W52 그룹 안전 검증 결과입니다. 둘 다
+F9와 EM24의 피처를 내부 결합하며 확률 앙상블은 포함하지 않습니다.
+v4는 입력 변이 프로필에서 그룹을 자동 생성해 F9와 EM24의 내부 OOF를
+같은 그룹 경계로 분리합니다. 외부에서 `groups`를 전달하면 해당 값을 우선하며,
+`auto_profile_groups: false`로 기존 행 단위 내부 OOF를 명시적으로 복원할 수 있습니다.
+Public LB는 v3 `0.3390097657`, v4 `0.3342990633`으로 v4가
+`-0.0047107024` 낮아 최종 제출 우선순위는 v3로 유지합니다.
+v3 재현 설정은 `configs/test_003_pipecomb_v3.yaml`에 따로 보존합니다.
+상세 실험 기록은 `experiments/jyp_preprocessing/test_003_pipeComb_v3.md`와
+`experiments/jyp_preprocessing/test_003_pipeComb_v4.md`에 있습니다.
 
 별도 실행기 없이 공용 학습 명령을 사용합니다.
 

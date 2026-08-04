@@ -7,6 +7,7 @@ F7의 피처 순서를 그대로 유지하고, 환자 전체에서 관찰된 380
 아미노산 치환쌍의 event count에 log1p를 적용한 F9 블록을 마지막에 붙입니다.
 """
 from __future__ import annotations
+import hashlib
 import math
 import re
 from functools import lru_cache
@@ -16,7 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from collections import Counter
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from dataclasses import dataclass, replace
 from src.pipelines.base import PreprocessingPipeline
 WT = 'WT'
@@ -290,10 +291,36 @@ def build_f9_global_aa_substitution_matrix(scan: MutationScanResult) -> sparse.c
         raise RuntimeError('F9 아미노산 치환 피처 수가 고정 스키마와 일치하지 않습니다.')
     return matrix
 
-def select_active_gene_consequences(scan: MutationScanResult, gene_columns: Sequence[str]) -> tuple[np.ndarray, list[str]]:
+def f2_profile_support_counts(scan: MutationScanResult, groups: Sequence[object] | np.ndarray | pd.Series) -> np.ndarray:
+    """Count distinct profiles containing each gene×consequence feature."""
+    group_ids = _normalize_oof_groups(groups, expected_length=scan.f2_all_gene_consequences.shape[0])
+    presence = scan.f2_all_gene_consequences.copy()
+    presence.sum_duplicates()
+    if presence.nnz:
+        presence.data.fill(1.0)
+    group_rows = sparse.csr_matrix(
+        (
+            np.ones(len(group_ids), dtype=np.float32),
+            (group_ids, np.arange(len(group_ids), dtype=np.int64)),
+        ),
+        shape=(int(group_ids.max()) + 1 if len(group_ids) else 0, len(group_ids)),
+        dtype=np.float32,
+    )
+    grouped_presence = group_rows @ presence
+    return np.asarray(grouped_presence.getnnz(axis=0), dtype=np.int64)
+
+def select_active_gene_consequences(scan: MutationScanResult, gene_columns: Sequence[str], *, minimum_profile_support: int=1, groups: Sequence[object] | np.ndarray | pd.Series | None=None) -> tuple[np.ndarray, list[str]]:
     """Fold-Train에서 관찰된 유전자×변이유형 열만 고정합니다."""
-    support = np.asarray(scan.f2_all_gene_consequences.sum(axis=0)).ravel()
-    active_indices = np.flatnonzero(support > 0)
+    if minimum_profile_support < 1:
+        raise ValueError('F2 minimum profile support는 1 이상이어야 합니다.')
+    if minimum_profile_support == 1:
+        support = np.asarray(scan.f2_all_gene_consequences.sum(axis=0)).ravel()
+        active_indices = np.flatnonzero(support > 0)
+    else:
+        if groups is None:
+            raise ValueError('F2 minimum profile support > 1 requires groups.')
+        support = f2_profile_support_counts(scan, groups)
+        active_indices = np.flatnonzero(support >= minimum_profile_support)
     feature_names: list[str] = []
     type_count = len(CONSEQUENCE_TYPES)
     for index in active_indices:
@@ -406,6 +433,34 @@ class F7PairStatistics:
     selection_frequency: tuple[int, ...]
 
 @dataclass(frozen=True)
+class F7OOFFoldAudit:
+    """Deterministic evidence describing one F7 outer OOF split."""
+    fold_number: int
+    train_size: int
+    valid_size: int
+    train_index_hash: str
+    valid_index_hash: str
+    train_group_count: int | None
+    valid_group_count: int | None
+    group_overlap_count: int | None
+    group_overlap_free: bool | None
+
+@dataclass(frozen=True)
+class F7StabilityFoldAudit:
+    """Group-separation evidence for one pairwise stability split."""
+    fit_scope: str
+    oof_fold: int | None
+    first_label: str
+    second_label: str
+    fold_number: int
+    train_size: int
+    valid_size: int
+    train_group_count: int
+    valid_group_count: int
+    group_overlap_count: int
+    group_overlap_free: bool
+
+@dataclass(frozen=True)
 class F7PairContrastModel:
     """Fold-train state used unchanged for validation or test transformation."""
     ordered_pairs: tuple[F7OrderedPair, ...]
@@ -421,6 +476,11 @@ class F7PairContrastModel:
     minimum_selection_frequency: int
     random_state: int
     oof_fit_instabilities: tuple[tuple[int, str, str, str], ...] = ()
+    oof_group_safe: bool = False
+    oof_group_count: int | None = None
+    oof_fold_audits: tuple[F7OOFFoldAudit, ...] = ()
+    grouped_stability: bool = False
+    stability_fold_audits: tuple[F7StabilityFoldAudit, ...] = ()
 
 def _normalize_pair(pair: F7OrderedPair | Sequence[object]) -> F7OrderedPair:
     if isinstance(pair, F7OrderedPair):
@@ -452,6 +512,41 @@ def _normalize_inputs(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, 
         raise ValueError('F7 cells cannot be marked as both mutated and missing.')
     normalized_labels = np.asarray([str(label) for label in labels], dtype=str)
     return (mutations, missing, normalized_labels, names)
+
+def _normalize_oof_groups(
+    groups: Sequence[object] | np.ndarray | pd.Series,
+    *,
+    expected_length: int,
+) -> np.ndarray:
+    """Validate group labels and encode them as deterministic integer IDs."""
+    if isinstance(groups, (pd.Series, pd.Index)):
+        values = groups.to_numpy(dtype=object, copy=False)
+    else:
+        values = np.asarray(groups, dtype=object)
+    if values.ndim != 1:
+        raise ValueError('F7 OOF groups must be one-dimensional.')
+    if len(values) != expected_length:
+        raise ValueError('F7 OOF groups row count does not match the input matrix.')
+
+    group_ids = np.empty(len(values), dtype=np.int64)
+    encoded: dict[object, int] = {}
+    for index, value in enumerate(values):
+        missing = pd.isna(value)
+        if isinstance(missing, (bool, np.bool_)) and bool(missing):
+            raise ValueError('F7 OOF groups must not contain missing values.')
+        try:
+            hash(value)
+        except TypeError as error:
+            raise ValueError('F7 OOF group values must be hashable.') from error
+        try:
+            group_ids[index] = encoded.setdefault(value, len(encoded))
+        except (TypeError, ValueError) as error:
+            raise ValueError('F7 OOF group values must support scalar equality.') from error
+    return group_ids
+
+def _index_hash(indices: np.ndarray) -> str:
+    normalized = np.asarray(indices, dtype='<i8')
+    return hashlib.sha256(normalized.tobytes()).hexdigest()
 
 def _validate_parameters(*, top_k_per_direction: int, minimum_pair_mutation_support: int, laplace_alpha: float, burden_quantiles: int, stability_folds: int, minimum_direction_consistency: int, minimum_selection_frequency: int) -> None:
     if top_k_per_direction < 1:
@@ -517,11 +612,12 @@ def _rank_direction(effect: np.ndarray, eligible: np.ndarray, gene_names: np.nda
     order = np.lexsort((gene_names[candidates], -(effect[candidates] * direction)))
     return candidates[order[:top_k]].astype(np.int64, copy=False)
 
-def _fit_pair_statistics(matrix: sparse.csr_matrix, missing: sparse.csr_matrix, labels: np.ndarray, gene_names: tuple[str, ...], pair: F7OrderedPair, *, top_k_per_direction: int, minimum_pair_mutation_support: int, laplace_alpha: float, burden_quantiles: int, stability_folds: int, minimum_direction_consistency: int, minimum_selection_frequency: int, random_state: int) -> F7PairStatistics:
+def _fit_pair_statistics(matrix: sparse.csr_matrix, missing: sparse.csr_matrix, labels: np.ndarray, gene_names: tuple[str, ...], pair: F7OrderedPair, *, groups: np.ndarray | None, grouped_stability: bool, fit_scope: str, oof_fold: int | None, top_k_per_direction: int, minimum_pair_mutation_support: int, laplace_alpha: float, burden_quantiles: int, stability_folds: int, minimum_direction_consistency: int, minimum_selection_frequency: int, random_state: int) -> tuple[F7PairStatistics, tuple[F7StabilityFoldAudit, ...]]:
     pair_rows = (labels == pair.first_label) | (labels == pair.second_label)
     pair_matrix = matrix[pair_rows]
     pair_missing = missing[pair_rows]
     pair_labels = np.where(labels[pair_rows] == pair.first_label, 0, 1).astype(np.int8)
+    pair_groups = None if groups is None else groups[pair_rows]
     class_sizes = np.bincount(pair_labels, minlength=2)
     if np.any(class_sizes < stability_folds):
         raise ValueError(f'F7 pair {pair.first_label!r} vs {pair.second_label!r} requires at least {stability_folds} samples per label for stability CV; found {class_sizes[0]} and {class_sizes[1]}.')
@@ -530,10 +626,54 @@ def _fit_pair_statistics(matrix: sparse.csr_matrix, missing: sparse.csr_matrix, 
     eligible = support >= minimum_pair_mutation_support
     direction_counts = np.zeros(matrix.shape[1], dtype=np.int16)
     selection_counts = np.zeros(matrix.shape[1], dtype=np.int16)
-    splitter = StratifiedKFold(n_splits=stability_folds, shuffle=True, random_state=random_state)
+    if grouped_stability:
+        if pair_groups is None:
+            raise ValueError('F7 grouped stability requires groups.')
+        class_group_counts = np.asarray([np.unique(pair_groups[pair_labels == label]).size for label in (0, 1)])
+        if np.any(class_group_counts < stability_folds):
+            raise ValueError(f'F7 pair {pair.first_label!r} vs {pair.second_label!r} grouped stability requires at least {stability_folds} distinct groups per label; found {class_group_counts[0]} and {class_group_counts[1]}.')
+        splitter = StratifiedGroupKFold(n_splits=stability_folds, shuffle=True, random_state=random_state)
+        splits = splitter.split(np.zeros(len(pair_labels)), pair_labels, pair_groups)
+    else:
+        splitter = StratifiedKFold(n_splits=stability_folds, shuffle=True, random_state=random_state)
+        splits = splitter.split(np.zeros(len(pair_labels)), pair_labels)
     names_array = np.asarray(gene_names)
     full_direction = np.sign(full_effect)
-    for train_indices, _ in splitter.split(np.zeros(len(pair_labels)), pair_labels):
+    stability_audits: list[F7StabilityFoldAudit] = []
+    for fold_number, (train_indices, valid_indices) in enumerate(splits, start=1):
+        if grouped_stability and (
+            np.unique(pair_labels[train_indices]).size != 2
+            or np.unique(pair_labels[valid_indices]).size != 2
+        ):
+            raise ValueError(
+                f'F7 pair {pair.first_label!r} vs {pair.second_label!r} grouped '
+                f'stability fold {fold_number} does not contain both labels in '
+                'train and validation.'
+            )
+        if pair_groups is not None:
+            train_groups = np.unique(pair_groups[train_indices])
+            valid_groups = np.unique(pair_groups[valid_indices])
+            overlap_count = int(np.intersect1d(train_groups, valid_groups).size)
+            if grouped_stability and overlap_count:
+                raise RuntimeError(
+                    f'F7 grouped stability fold {fold_number} has overlapping '
+                    'train/validation groups.'
+                )
+            stability_audits.append(
+                F7StabilityFoldAudit(
+                    fit_scope=fit_scope,
+                    oof_fold=oof_fold,
+                    first_label=pair.first_label,
+                    second_label=pair.second_label,
+                    fold_number=fold_number,
+                    train_size=len(train_indices),
+                    valid_size=len(valid_indices),
+                    train_group_count=int(train_groups.size),
+                    valid_group_count=int(valid_groups.size),
+                    group_overlap_count=overlap_count,
+                    group_overlap_free=overlap_count == 0,
+                )
+            )
         fold_matrix = pair_matrix[train_indices]
         fold_missing = pair_missing[train_indices]
         fold_labels = pair_labels[train_indices]
@@ -548,17 +688,21 @@ def _fit_pair_statistics(matrix: sparse.csr_matrix, missing: sparse.csr_matrix, 
     selected_parts = [_rank_direction(full_effect, stable, names_array, direction=direction, top_k=top_k_per_direction) for direction in (1, -1)]
     selected = np.concatenate(selected_parts)
     directions = np.sign(full_effect[selected]).astype(np.int8)
-    return F7PairStatistics(pair=pair, selected_gene_indices=tuple((int(value) for value in selected)), selected_gene_names=tuple((gene_names[index] for index in selected)), directions=tuple((int(value) for value in directions)), burden_adjusted_effects=tuple((float(value) for value in full_effect[selected])), mutation_log_odds=tuple((float(value) for value in log_odds[selected])), log_mutation_probability_ratio=tuple((float(value) for value in np.log(probability_first[selected] / probability_second[selected]))), log_wt_probability_ratio=tuple((float(value) for value in np.log((1.0 - probability_first[selected]) / (1.0 - probability_second[selected])))), mutation_support=tuple((int(value) for value in support[selected])), direction_consistency=tuple((int(value) for value in direction_counts[selected])), selection_frequency=tuple((int(value) for value in selection_counts[selected])))
+    statistics = F7PairStatistics(pair=pair, selected_gene_indices=tuple((int(value) for value in selected)), selected_gene_names=tuple((gene_names[index] for index in selected)), directions=tuple((int(value) for value in directions)), burden_adjusted_effects=tuple((float(value) for value in full_effect[selected])), mutation_log_odds=tuple((float(value) for value in log_odds[selected])), log_mutation_probability_ratio=tuple((float(value) for value in np.log(probability_first[selected] / probability_second[selected]))), log_wt_probability_ratio=tuple((float(value) for value in np.log((1.0 - probability_first[selected]) / (1.0 - probability_second[selected])))), mutation_support=tuple((int(value) for value in support[selected])), direction_consistency=tuple((int(value) for value in direction_counts[selected])), selection_frequency=tuple((int(value) for value in selection_counts[selected])))
+    return statistics, tuple(stability_audits)
 
 def build_f7_feature_names(ordered_pairs: Sequence[F7OrderedPair | Sequence[object]]) -> list[str]:
     """Return two deterministic feature names for every ordered pair."""
     pairs = tuple((_normalize_pair(pair) for pair in ordered_pairs))
     return [f"F7__{pair.first_label.replace(' ', '_')}_vs_{pair.second_label.replace(' ', '_')}__{score_name}" for pair in pairs for score_name in F7_SCORE_NAMES]
 
-def fit_full(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, labels: Sequence[object] | np.ndarray, gene_names: Sequence[str], ordered_pairs: Sequence[F7OrderedPair | Sequence[object]], *, top_k_per_direction: int=25, minimum_pair_mutation_support: int=10, laplace_alpha: float=4.0, burden_quantiles: int=5, stability_folds: int=5, minimum_direction_consistency: int=4, minimum_selection_frequency: int=3, random_state: int=42) -> F7PairContrastModel:
+def fit_full(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, labels: Sequence[object] | np.ndarray, gene_names: Sequence[str], ordered_pairs: Sequence[F7OrderedPair | Sequence[object]], *, groups: Sequence[object] | np.ndarray | pd.Series | None=None, grouped_stability: bool=False, fit_scope: str='full_fit', oof_fold: int | None=None, top_k_per_direction: int=25, minimum_pair_mutation_support: int=10, laplace_alpha: float=4.0, burden_quantiles: int=5, stability_folds: int=5, minimum_direction_consistency: int=4, minimum_selection_frequency: int=3, random_state: int=42) -> F7PairContrastModel:
     """Fit stable pair contrasts on one training partition."""
     _validate_parameters(top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency)
     mutations, missing, normalized_labels, names = _normalize_inputs(matrix, missing_matrix, labels, gene_names)
+    normalized_groups = None if groups is None else _normalize_oof_groups(groups, expected_length=len(normalized_labels))
+    if grouped_stability and normalized_groups is None:
+        raise ValueError('F7 grouped stability requires groups.')
     pairs = tuple((_normalize_pair(pair) for pair in ordered_pairs))
     if not pairs:
         raise ValueError('F7 requires at least one ordered label pair.')
@@ -568,8 +712,10 @@ def fit_full(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, labels: S
     absent = sorted({label for pair in pairs for label in (pair.first_label, pair.second_label)} - available)
     if absent:
         raise ValueError(f'F7 ordered pairs contain labels absent from training data: {absent}.')
-    statistics = tuple((_fit_pair_statistics(mutations, missing, normalized_labels, names, pair, top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency, random_state=random_state) for pair in pairs))
-    return F7PairContrastModel(ordered_pairs=pairs, pair_statistics=statistics, gene_names=names, feature_names=tuple(build_f7_feature_names(pairs)), top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency, random_state=random_state)
+    fitted = tuple((_fit_pair_statistics(mutations, missing, normalized_labels, names, pair, groups=normalized_groups, grouped_stability=grouped_stability, fit_scope=fit_scope, oof_fold=oof_fold, top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency, random_state=random_state) for pair in pairs))
+    statistics = tuple(item[0] for item in fitted)
+    stability_audits = tuple(audit for item in fitted for audit in item[1])
+    return F7PairContrastModel(ordered_pairs=pairs, pair_statistics=statistics, gene_names=names, feature_names=tuple(build_f7_feature_names(pairs)), top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency, random_state=random_state, grouped_stability=grouped_stability, stability_fold_audits=stability_audits)
 
 def build_f7_matrix(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, model: F7PairContrastModel) -> sparse.csr_matrix:
     """Apply a fitted model; missing genes contribute to neither likelihood side."""
@@ -600,7 +746,7 @@ def build_f7_matrix(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, mo
         raise RuntimeError('F7 output contains non-finite values.')
     return sparse.csr_matrix(output, dtype=np.float32)
 
-def fit_with_oof(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, labels: Sequence[object] | np.ndarray, gene_names: Sequence[str], ordered_pairs: Sequence[F7OrderedPair | Sequence[object]], *, oof_folds: int=5, top_k_per_direction: int=25, minimum_pair_mutation_support: int=10, laplace_alpha: float=4.0, burden_quantiles: int=5, stability_folds: int=5, minimum_direction_consistency: int=4, minimum_selection_frequency: int=3, random_state: int=42) -> tuple[F7PairContrastModel, sparse.csr_matrix]:
+def fit_with_oof(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, labels: Sequence[object] | np.ndarray, gene_names: Sequence[str], ordered_pairs: Sequence[F7OrderedPair | Sequence[object]], *, groups: Sequence[object] | np.ndarray | pd.Series | None=None, grouped_stability: bool=False, oof_folds: int=5, top_k_per_direction: int=25, minimum_pair_mutation_support: int=10, laplace_alpha: float=4.0, burden_quantiles: int=5, stability_folds: int=5, minimum_direction_consistency: int=4, minimum_selection_frequency: int=3, random_state: int=42) -> tuple[F7PairContrastModel, sparse.csr_matrix]:
     """Return the full model and fold-local, leakage-safe training features."""
     mutations, missing, normalized_labels, names = _normalize_inputs(matrix, missing_matrix, labels, gene_names)
     if oof_folds < 2:
@@ -608,16 +754,43 @@ def fit_with_oof(matrix: sparse.spmatrix, missing_matrix: sparse.spmatrix, label
     _, counts = np.unique(normalized_labels, return_counts=True)
     if not len(counts) or counts.min() < oof_folds:
         raise ValueError(f'F7 OOF requires at least {oof_folds} samples for every label.')
+    normalized_groups = None if groups is None else _normalize_oof_groups(groups, expected_length=len(normalized_labels))
+    if grouped_stability and normalized_groups is None:
+        raise ValueError('F7 grouped stability requires groups.')
     fit_kwargs = dict(top_k_per_direction=top_k_per_direction, minimum_pair_mutation_support=minimum_pair_mutation_support, laplace_alpha=laplace_alpha, burden_quantiles=burden_quantiles, stability_folds=stability_folds, minimum_direction_consistency=minimum_direction_consistency, minimum_selection_frequency=minimum_selection_frequency, random_state=random_state)
-    full_model = fit_full(mutations, missing, normalized_labels, names, ordered_pairs, **fit_kwargs)
-    splitter = StratifiedKFold(n_splits=oof_folds, shuffle=True, random_state=random_state)
+    full_model = fit_full(mutations, missing, normalized_labels, names, ordered_pairs, groups=normalized_groups, grouped_stability=grouped_stability, **fit_kwargs)
+    if normalized_groups is None:
+        splitter = StratifiedKFold(n_splits=oof_folds, shuffle=True, random_state=random_state)
+        splits = splitter.split(np.zeros(len(normalized_labels)), normalized_labels)
+    else:
+        group_count = int(np.unique(normalized_groups).size)
+        if group_count < oof_folds:
+            raise ValueError(f'F7 grouped OOF requires at least {oof_folds} distinct groups.')
+        splitter = StratifiedGroupKFold(n_splits=oof_folds, shuffle=True, random_state=random_state)
+        splits = splitter.split(np.zeros(len(normalized_labels)), normalized_labels, normalized_groups)
     oof = np.zeros((mutations.shape[0], len(full_model.feature_names)), dtype=np.float32)
     oof_fit_instabilities: list[tuple[int, str, str, str]] = []
-    for fold_number, (train_indices, valid_indices) in enumerate(splitter.split(np.zeros(len(normalized_labels)), normalized_labels), start=1):
-        fold_model = fit_full(mutations[train_indices], missing[train_indices], normalized_labels[train_indices], names, ordered_pairs, **{**fit_kwargs, 'random_state': random_state + fold_number})
+    fold_audits: list[F7OOFFoldAudit] = []
+    stability_audits: list[F7StabilityFoldAudit] = []
+    for fold_number, (train_indices, valid_indices) in enumerate(splits, start=1):
+        if normalized_groups is None:
+            train_group_count = valid_group_count = overlap_count = None
+            overlap_free = None
+        else:
+            train_groups = np.unique(normalized_groups[train_indices])
+            valid_groups = np.unique(normalized_groups[valid_indices])
+            overlap_count = int(np.intersect1d(train_groups, valid_groups).size)
+            if overlap_count:
+                raise RuntimeError(f'F7 grouped OOF fold {fold_number} has overlapping train/validation groups.')
+            train_group_count = int(train_groups.size)
+            valid_group_count = int(valid_groups.size)
+            overlap_free = True
+        fold_audits.append(F7OOFFoldAudit(fold_number=fold_number, train_size=len(train_indices), valid_size=len(valid_indices), train_index_hash=_index_hash(train_indices), valid_index_hash=_index_hash(valid_indices), train_group_count=train_group_count, valid_group_count=valid_group_count, group_overlap_count=overlap_count, group_overlap_free=overlap_free))
+        fold_model = fit_full(mutations[train_indices], missing[train_indices], normalized_labels[train_indices], names, ordered_pairs, groups=None if normalized_groups is None else normalized_groups[train_indices], grouped_stability=grouped_stability, fit_scope='outer_oof', oof_fold=fold_number, **{**fit_kwargs, 'random_state': random_state + fold_number})
+        stability_audits.extend(fold_model.stability_fold_audits)
         oof_fit_instabilities.extend(((fold_number, statistics.pair.first_label, statistics.pair.second_label, 'zero_stable_genes') for statistics in fold_model.pair_statistics if not statistics.selected_gene_indices))
         oof[valid_indices] = build_f7_matrix(mutations[valid_indices], missing[valid_indices], fold_model).toarray()
-    full_model = replace(full_model, oof_fit_instabilities=tuple(oof_fit_instabilities))
+    full_model = replace(full_model, oof_fit_instabilities=tuple(oof_fit_instabilities), oof_group_safe=normalized_groups is not None, oof_group_count=None if normalized_groups is None else int(np.unique(normalized_groups).size), oof_fold_audits=tuple(fold_audits), stability_fold_audits=full_model.stability_fold_audits + tuple(stability_audits))
     return (full_model, sparse.csr_matrix(oof, dtype=np.float32))
 
 def build_f7_selected_gene_catalog(model: F7PairContrastModel) -> list[dict[str, object]]:
@@ -639,7 +812,30 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
     name = 'jyp_f9'
     artifact_schema_version = 5
 
-    def __init__(self, *, burden_clip_quantile: float=0.99, f3_position_min_support: int=2, f3_aa_min_support: int=2, f4_min_support: int=10, f7_pairs: Sequence[Sequence[str]]=(('KIRC', 'KIPAN'), ('LGG', 'GBMLGG')), f7_top_k_per_direction: int=5, f7_min_gene_support: int=10, f7_laplace_alpha: float=4.0, f7_burden_quantiles: int=5, f7_stability_folds: int=5, f7_min_direction_consistency: int=4, f7_min_selection_frequency: int=3, f7_random_state: int=42, show_progress: bool=True, progress_interval: int=25000) -> None:
+    def __init__(
+        self,
+        *,
+        burden_clip_quantile: float = 0.99,
+        f2_min_profile_support: int = 1,
+        f3_position_min_support: int = 3,
+        f3_aa_min_support: int = 3,
+        f4_min_support: int = 5,
+        f7_pairs: Sequence[Sequence[str]] = (
+            ('KIRC', 'KIPAN'),
+            ('LGG', 'GBMLGG'),
+        ),
+        f7_top_k_per_direction: int = 3,
+        f7_min_gene_support: int = 10,
+        f7_laplace_alpha: float = 4.0,
+        f7_burden_quantiles: int = 5,
+        f7_stability_folds: int = 5,
+        f7_min_direction_consistency: int = 4,
+        f7_min_selection_frequency: int = 3,
+        f7_random_state: int = 42,
+        f7_grouped_stability: bool = False,
+        show_progress: bool = False,
+        progress_interval: int = 25000,
+    ) -> None:
         super().__init__()
         self.pipeline_name = self.name
         self.feature_blocks = ('f0', 'f1', 'f2', 'f3_position', 'f3_aa', 'f4', 'f7_paircontrast', 'f9_global_aa_pair_log1p')
@@ -651,6 +847,9 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
         if not 0.0 < burden_clip_quantile <= 1.0:
             raise ValueError('burden_clip_quantile은 0보다 크고 1 이하여야 합니다.')
         self.burden_clip_quantile = float(burden_clip_quantile)
+        if f2_min_profile_support < 1:
+            raise ValueError('F2 minimum profile support는 1 이상이어야 합니다.')
+        self.f2_min_profile_support = int(f2_min_profile_support)
         if f3_position_min_support < 1:
             raise ValueError('F3 minimum support는 1 이상이어야 합니다.')
         self.f3_position_min_support = int(f3_position_min_support)
@@ -693,20 +892,26 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
         self.f7_min_direction_consistency = int(f7_min_direction_consistency)
         self.f7_min_selection_frequency = int(f7_min_selection_frequency)
         self.f7_random_state = int(f7_random_state)
+        self.f7_grouped_stability = bool(f7_grouped_stability)
 
-    def fit(self, features: pd.DataFrame, labels: pd.Series | Sequence[str]) -> 'F9GlobalAAPairNoRawPreprocessingPipeline':
+    def fit(self, features: pd.DataFrame, labels: pd.Series | Sequence[str], *, groups: Sequence[object] | np.ndarray | pd.Series | None=None) -> 'F9GlobalAAPairNoRawPreprocessingPipeline':
         frame = self._validate_frame(features)
         label_values = self._validate_labels(frame, labels)
+        if (self.f2_min_profile_support > 1 or self.f7_grouped_stability) and groups is None:
+            raise ValueError('F2 profile support or F7 grouped stability requires groups.')
+        normalized_groups = None if groups is None else _normalize_oof_groups(groups, expected_length=len(frame))
         self.gene_columns_ = frame.columns.tolist()
         self.label_encoder.fit(label_values)
         scan = self._scan(frame, stage='fit')
         self.active_gene_indices_, self.active_gene_columns_, self.dropped_constant_columns = select_active_genes(scan, self.gene_columns_)
         self.burden_clip_value_ = fit_burden_clip(scan, quantile=self.burden_clip_quantile)
-        self.active_f2_indices_, self.f2_feature_names_ = select_active_gene_consequences(scan, self.gene_columns_)
+        self.f2_profile_support_counts_ = None if normalized_groups is None else f2_profile_support_counts(scan, normalized_groups)
+        self.f2_profile_support_histogram_ = {} if self.f2_profile_support_counts_ is None else {int(value): int(count) for value, count in zip(*np.unique(self.f2_profile_support_counts_, return_counts=True))}
+        self.active_f2_indices_, self.f2_feature_names_ = select_active_gene_consequences(scan, self.gene_columns_, minimum_profile_support=self.f2_min_profile_support, groups=normalized_groups)
         self.active_f3_position_indices_, self.f3_position_feature_names_ = select_active_gene_position_bins(scan, self.gene_columns_, minimum_support=self.f3_position_min_support)
         self.active_f3_aa_indices_, self.f3_aa_feature_names_ = select_active_gene_aa_transitions(scan, self.gene_columns_, minimum_support=self.f3_aa_min_support)
         self.f4_hotspot_vocabulary_, self.f4_feature_names_ = select_exact_hotspot_vocabulary(scan, self.gene_columns_, minimum_support=self.f4_min_support)
-        self.f7_pair_contrast_model_, self._fit_f7_oof_matrix_ = fit_with_oof(scan.f0_all_genes, build_missing_gene_matrix(frame), label_values, self.gene_columns_, self.f7_pairs, oof_folds=self.f7_stability_folds, top_k_per_direction=self.f7_top_k_per_direction, minimum_pair_mutation_support=self.f7_min_gene_support, laplace_alpha=self.f7_laplace_alpha, burden_quantiles=self.f7_burden_quantiles, stability_folds=self.f7_stability_folds, minimum_direction_consistency=self.f7_min_direction_consistency, minimum_selection_frequency=self.f7_min_selection_frequency, random_state=self.f7_random_state)
+        self.f7_pair_contrast_model_, self._fit_f7_oof_matrix_ = fit_with_oof(scan.f0_all_genes, build_missing_gene_matrix(frame), label_values, self.gene_columns_, self.f7_pairs, groups=normalized_groups, grouped_stability=self.f7_grouped_stability, oof_folds=self.f7_stability_folds, top_k_per_direction=self.f7_top_k_per_direction, minimum_pair_mutation_support=self.f7_min_gene_support, laplace_alpha=self.f7_laplace_alpha, burden_quantiles=self.f7_burden_quantiles, stability_folds=self.f7_stability_folds, minimum_direction_consistency=self.f7_min_direction_consistency, minimum_selection_frequency=self.f7_min_selection_frequency, random_state=self.f7_random_state)
         self.f7_feature_names_ = list(self.f7_pair_contrast_model_.feature_names)
         selected_arrays = [np.asarray(statistics.selected_gene_indices, dtype=np.int64) for statistics in self.f7_pair_contrast_model_.pair_statistics if statistics.selected_gene_indices]
         self.f7_selected_gene_indices_ = np.unique(np.concatenate(selected_arrays)) if selected_arrays else np.asarray([], dtype=np.int64)
@@ -755,8 +960,8 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
             raise RuntimeError('생성된 피처 수와 고정 스키마가 일치하지 않습니다.')
         return output
 
-    def fit_transform(self, features: pd.DataFrame, labels: pd.Series | Sequence[str]):
-        self.fit(features, labels)
+    def fit_transform(self, features: pd.DataFrame, labels: pd.Series | Sequence[str], *, groups: Sequence[object] | np.ndarray | pd.Series | None=None):
+        self.fit(features, labels, groups=groups)
         frame = self._validate_transform_frame(features)
         scan = self._fit_scan_
         self._log('학습 행렬의 target-aware 블록은 내부 OOF 통계만 사용합니다.')
@@ -777,6 +982,9 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
             'f0_features': len(self.active_gene_columns_),
             'f1_features': len(F1_COLUMNS),
             'f2_features': len(self.f2_feature_names_),
+            'f2_min_profile_support': self.f2_min_profile_support,
+            'f2_profile_support_available': self.f2_profile_support_counts_ is not None,
+            'f2_profile_support_histogram': dict(self.f2_profile_support_histogram_),
             'f3_position_features': len(self.f3_position_feature_names_),
             'f3_aa_features': len(self.f3_aa_feature_names_),
             'f4_exact_hotspot_features': len(self.f4_feature_names_),
@@ -785,6 +993,12 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
             'f7_pair_count': len(self.f7_pairs),
             'f7_pair_contrast_features': len(self.f7_feature_names_),
             'f7_selected_gene_union': len(self.f7_selected_gene_indices_),
+            'f7_oof_group_safe': self.f7_pair_contrast_model_.oof_group_safe,
+            'f7_oof_group_count': self.f7_pair_contrast_model_.oof_group_count,
+            'f7_oof_fold_count': len(self.f7_pair_contrast_model_.oof_fold_audits),
+            'f7_grouped_stability': self.f7_pair_contrast_model_.grouped_stability,
+            'f7_stability_fold_audit_count': len(self.f7_pair_contrast_model_.stability_fold_audits),
+            'f7_stability_group_overlap_count': sum(audit.group_overlap_count for audit in self.f7_pair_contrast_model_.stability_fold_audits),
             'f9_global_aa_pair_features': len(F9_AA_SUBSTITUTION_FEATURE_NAMES),
             'f9_global_aa_pair_scale': 'log1p_event_count',
             'f5_missing_policy': 'legacy_treat_as_wt',
@@ -803,12 +1017,44 @@ class F9GlobalAAPairNoRawPreprocessingPipeline(PreprocessingPipeline):
             'f5_selected_gene_indices': np.asarray([], dtype=np.int64),
             'f5_output_column_indices': np.asarray([], dtype=np.int64),
             'f5_fit_oof_matrix': None,
+            'f2_profile_support_counts': None if self.f2_profile_support_counts_ is None else self.f2_profile_support_counts_.copy(),
+            'f2_profile_support_histogram': dict(self.f2_profile_support_histogram_),
             'f7_pair_contrast_model': self.f7_pair_contrast_model_,
             'f7_selected_gene_indices': self.f7_selected_gene_indices_.copy(),
             'f7_selected_gene_catalog': [
                 dict(item) for item in self.f7_selected_gene_catalog_
             ],
             'f7_fit_oof_matrix': self._fit_f7_oof_matrix_,
+            'f7_oof_fold_audits': [
+                {
+                    'fold_number': audit.fold_number,
+                    'train_size': audit.train_size,
+                    'valid_size': audit.valid_size,
+                    'train_index_hash': audit.train_index_hash,
+                    'valid_index_hash': audit.valid_index_hash,
+                    'train_group_count': audit.train_group_count,
+                    'valid_group_count': audit.valid_group_count,
+                    'group_overlap_count': audit.group_overlap_count,
+                    'group_overlap_free': audit.group_overlap_free,
+                }
+                for audit in self.f7_pair_contrast_model_.oof_fold_audits
+            ],
+            'f7_stability_fold_audits': [
+                {
+                    'fit_scope': audit.fit_scope,
+                    'oof_fold': audit.oof_fold,
+                    'first_label': audit.first_label,
+                    'second_label': audit.second_label,
+                    'fold_number': audit.fold_number,
+                    'train_size': audit.train_size,
+                    'valid_size': audit.valid_size,
+                    'train_group_count': audit.train_group_count,
+                    'valid_group_count': audit.valid_group_count,
+                    'group_overlap_count': audit.group_overlap_count,
+                    'group_overlap_free': audit.group_overlap_free,
+                }
+                for audit in self.f7_pair_contrast_model_.stability_fold_audits
+            ],
         }
 
     @property
