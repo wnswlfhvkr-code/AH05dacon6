@@ -192,7 +192,9 @@ def paired_bootstrap(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=Path, default=Path("configs/test_002_e8a.yaml")
+        "--config",
+        type=Path,
+        default=Path("configs/ensembles/test_002_e8a.yaml"),
     )
     args = parser.parse_args()
     config = load_config(args.config)
