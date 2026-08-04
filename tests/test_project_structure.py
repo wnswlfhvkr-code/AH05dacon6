@@ -71,6 +71,12 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
+    if config_path.parent.name == "ensembles":
+        experiment_name = config["project"]["experiment_name"]
+        suffix = experiment_name.removeprefix("test_002_")
+        assert (ROOT / "src" / "ensembles" / f"train_jh_{suffix}.py").is_file()
+        return
+
     if "xgb_blend_validation" in config:
         pipeline_configs = config["xgb_blend_validation"]["members"].values()
     elif "xgb_internal_fusion_validation" in config:
@@ -99,7 +105,7 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
         assert pipeline_path.is_relative_to((ROOT / "src" / "pipelines").resolve())
 
 
-def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
+def test_test_005_config_matches_selected_em_v30_e4_condition() -> None:
     expected_model = {
         "n_estimators": 500,
         "learning_rate": 0.03,
@@ -114,7 +120,7 @@ def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
     with (ROOT / "configs" / "test_005.yaml").open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert config["preprocessing"]["name"] == "em_v19"
+    assert config["preprocessing"]["name"] == "em_v30"
     assert {
         key: config["model"][key]
         for key in expected_model

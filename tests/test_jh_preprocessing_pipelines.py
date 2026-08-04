@@ -11,6 +11,7 @@ from src.pipelines.pipeline_jh_v04 import (
     split_mutation_tokens,
 )
 from src.pipelines.pipeline_jh_v09 import JHV09PreprocessingPipeline
+from src.pipelines.pipeline_jh_v10 import JHV10PreprocessingPipeline
 
 
 def sample_features() -> pd.DataFrame:
@@ -88,3 +89,23 @@ def test_v09_applies_fold_fitted_tfidf_and_keeps_f1() -> None:
     assert pipeline.summary()["f1_features"] == 22
     assert pipeline.summary()["tfidf_token_features"] > 0
     assert np.isfinite(transformed.data).all()
+
+
+def test_v10_reduces_tfidf_and_appends_f1_as_dense_features() -> None:
+    features = sample_features()
+    labels = pd.Series(["A", "A", "B", "B", "A", "B"])
+    pipeline = JHV10PreprocessingPipeline(
+        f4_min_support=1,
+        svd_components=2,
+        svd_n_iter=3,
+        svd_random_state=7,
+    )
+    transformed = pipeline.fit_transform(features, labels)
+    repeated = pipeline.transform(features)
+
+    assert isinstance(transformed, np.ndarray)
+    assert transformed.shape == repeated.shape == (len(features), 24)
+    assert pipeline.summary()["f1_features"] == 22
+    assert pipeline.summary()["svd_components"] == 2
+    assert pipeline.summary()["final_features"] == 24
+    assert np.isfinite(transformed).all()

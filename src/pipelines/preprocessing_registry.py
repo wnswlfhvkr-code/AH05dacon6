@@ -96,6 +96,7 @@ from src.pipelines.pipeline_jh_v06 import JHV06PreprocessingPipeline
 from src.pipelines.pipeline_jh_v07 import JHV07PreprocessingPipeline
 from src.pipelines.pipeline_jh_v08 import JHV08PreprocessingPipeline
 from src.pipelines.pipeline_jh_v09 import JHV09PreprocessingPipeline
+from src.pipelines.pipeline_jh_v10 import JHV10PreprocessingPipeline
 
 from src.pipelines.pipeline_em_v28 import EMV28PreprocessingPipeline
 from src.pipelines.pipeline_em_v29 import EMV29PreprocessingPipeline
@@ -183,6 +184,7 @@ PIPELINES = {
     "jh_v07": JHV07PreprocessingPipeline,
     "jh_v08": JHV08PreprocessingPipeline,
     "jh_v09": JHV09PreprocessingPipeline,
+    "jh_v10": JHV10PreprocessingPipeline,
     "em_v28": EMV28PreprocessingPipeline,
     "em_v29": EMV29PreprocessingPipeline,
     "em_v30": EMV30PreprocessingPipeline,
