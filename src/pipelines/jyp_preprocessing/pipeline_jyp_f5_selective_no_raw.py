@@ -535,7 +535,26 @@ class F5SelectiveNoRawPreprocessingPipeline(PreprocessingPipeline):
     name = 'jyp_f5_selective_no_raw'
     artifact_schema_version = 4
 
-    def __init__(self, *, burden_clip_quantile: float=0.99, f3_position_min_support: int=2, f3_aa_min_support: int=2, f4_min_support: int=10, f5_top_k_per_class: int=25, f5_min_gene_support: int=5, f5_laplace_alpha: float=1.0, f5_stability_folds: int=5, f5_min_direction_consistency: int=4, f5_min_selection_frequency: int=3, f5_random_state: int=42, f5_output_rare_class_count: int | None=None, f5_output_score_names: Sequence[str] | None=None, f5_output_class_labels: Sequence[str] | None=None, show_progress: bool=True, progress_interval: int=25000) -> None:
+    def __init__(
+        self,
+        *,
+        burden_clip_quantile: float = 0.99,
+        f3_position_min_support: int = 3,
+        f3_aa_min_support: int = 3,
+        f4_min_support: int = 5,
+        f5_top_k_per_class: int = 10,
+        f5_min_gene_support: int = 3,
+        f5_laplace_alpha: float = 1.0,
+        f5_stability_folds: int = 5,
+        f5_min_direction_consistency: int = 3,
+        f5_min_selection_frequency: int = 2,
+        f5_random_state: int = 42,
+        f5_output_rare_class_count: int | None = 10,
+        f5_output_score_names: Sequence[str] | None = None,
+        f5_output_class_labels: Sequence[str] | None = None,
+        show_progress: bool = True,
+        progress_interval: int = 25000,
+    ) -> None:
         super().__init__()
         self.pipeline_name = self.name
         self.feature_blocks = ('f0', 'f1', 'f2', 'f3_position', 'f3_aa', 'f4', 'f5_selective', 'missing_mask')
