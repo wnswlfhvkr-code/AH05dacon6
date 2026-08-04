@@ -1,6 +1,6 @@
 project:
   name: AH05dacon6
-  experiment_name: test_003_jyp_f11
+  experiment_name: test_003_pipeComb_v4_1
   seed: 42
   python_version: "3.14"
 
@@ -21,6 +21,7 @@ model:
   n_jobs: -1
   eval_metric: mlogloss
   tree_method: hist
+  device: cuda
 
 training:
   validation_fraction: 0.2
@@ -28,32 +29,5 @@ training:
   metric: macro_f1
 
 preprocessing:
-  name: jyp_f11
-  burden_clip_quantile: 0.99
-  f3_position_min_support: 3
-  f3_aa_min_support: 3
-  f4_min_support: 5
-
-  # f5_top_k_per_class: 10
-  # f5_min_gene_support: 3
-  # f5_laplace_alpha: 1.0
-  # f5_stability_folds: 5
-  # f5_min_direction_consistency: 3
-  # f5_min_selection_frequency: 2
-  # f5_random_state: 42
-
-  # f5_output_rare_class_count: 10
-
-  f7_pairs:
-    - [KIRC, KIPAN]
-    - [LGG, GBMLGG]
-  f7_top_k_per_direction: 3
-  f7_min_gene_support: 10
-  f7_laplace_alpha: 4.0
-  f7_burden_quantiles: 5
-  f7_stability_folds: 5
-  f7_min_direction_consistency: 4
-  f7_min_selection_frequency: 3
-  f7_random_state: 42
-  show_progress: true
-  progress_interval: 25000
+  name: pipeComb_v4
+  auto_profile_groups: true

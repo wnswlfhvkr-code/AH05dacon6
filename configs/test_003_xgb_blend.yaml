@@ -1,0 +1,69 @@
+# 동일 XGBoost와 동일 Fold에서 JYP F9 + EM16 확률 결합 가중치를 비교합니다.
+
+project:
+  name: AH05dacon6
+  experiment_name: test_003_jypF9_EM16_blend_3seed
+  seed: 42
+  python_version: "3.14"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: xgboost
+  n_estimators: 100
+  learning_rate: 0.1
+  max_depth: 6
+  n_jobs: -1
+  eval_metric: mlogloss
+  tree_method: hist
+  device: cuda
+
+xgb_blend_validation:
+  seeds: [101, 2027, 7301]
+  n_splits: 5
+  metric: macro_f1
+  overfit_threshold: 0.1
+  baseline_member: jyp_f9
+  enabled_candidates:
+    - jypF9_EM16_w50
+    - jypF9_EM16_w60
+    - jypF9_EM16_w70
+    - jypF9_EM16_w80
+    - jypF9_EM16_w90
+  show_progress: true
+  resume: true
+  submission_policy: write_local_candidates
+
+  members:
+    jyp_f9:
+      name: jyp_f9
+    em_v16:
+      name: em_v16
+      min_mutation_count: 5
+      top_genes_per_class: 20
+      smoothing: 0.5
+      max_log2_odds: 8.0
+      shrinkage: 10.0
+      min_hotspot_count: 5
+      max_hotspots: 384
+      inner_signature_folds: 5
+      signature_random_state: 42
+
+  candidates:
+    jypF9_EM16_w50:
+      weights: {jyp_f9: 0.50, em_v16: 0.50}
+    jypF9_EM16_w60:
+      weights: {jyp_f9: 0.60, em_v16: 0.40}
+    jypF9_EM16_w70:
+      weights: {jyp_f9: 0.70, em_v16: 0.30}
+    jypF9_EM16_w80:
+      weights: {jyp_f9: 0.80, em_v16: 0.20}
+    jypF9_EM16_w90:
+      weights: {jyp_f9: 0.90, em_v16: 0.10}

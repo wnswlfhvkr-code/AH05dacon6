@@ -12,6 +12,23 @@ ROOT = Path(__file__).parents[1]
 CONFIG_PATHS = sorted((ROOT / "configs").rglob("*.yaml"))
 
 
+def _find_xgboost_parameter_blocks(
+    value: object,
+    path: tuple[str, ...] = (),
+) -> list[tuple[tuple[str, ...], dict]]:
+    if not isinstance(value, dict):
+        return []
+
+    blocks: list[tuple[tuple[str, ...], dict]] = []
+    if value.get("name") == "xgboost" or (path and path[-1] == "xgboost"):
+        blocks.append((path, value))
+    for key, nested_value in value.items():
+        blocks.extend(
+            _find_xgboost_parameter_blocks(nested_value, (*path, str(key)))
+        )
+    return blocks
+
+
 def test_baseline_config_matches_notebook_parameters() -> None:
     root = Path(__file__).parents[1]
     config_path = root / "configs" / "baseline.yaml"
@@ -34,6 +51,22 @@ def test_baseline_config_matches_notebook_parameters() -> None:
     CONFIG_PATHS,
     ids=lambda path: str(path.relative_to(ROOT / "configs")),
 )
+def test_xgboost_configs_explicitly_use_cuda(config_path: Path) -> None:
+    with config_path.open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    for config_path_parts, xgboost_config in _find_xgboost_parameter_blocks(config):
+        config_name = ".".join(config_path_parts)
+        assert xgboost_config.get("device") == "cuda", (
+            f"{config_path.name} {config_name} must explicitly use device=cuda."
+        )
+
+
+@pytest.mark.parametrize(
+    "config_path",
+    CONFIG_PATHS,
+    ids=lambda path: str(path.relative_to(ROOT / "configs")),
+)
 def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -45,9 +78,67 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     assert module_spec is not None
     assert module_spec.origin is not None
     assert Path(module_spec.origin).is_file()
+    if config_path.name == "test_006.yaml":
+        assert config["project"]["experiment_name"].startswith("test_006")
+        assert (ROOT / "src" / "ensembles").is_dir()
+        return
+
+    if config_path.parent.name == "ensembles":
+        experiment_name = config["project"]["experiment_name"]
+        test_006_runners = {
+            "test_006_v01": "train_jh_e8b.py",
+            "test_006_v02": "train_jh_e8c.py",
+            "test_006_v03": "train_jh_e10.py",
+            "test_006_v04": "train_jh_e10a.py",
+            "test_006_v05": "train_jh_e10b1.py",
+        }
+        if experiment_name in test_006_runners:
+            assert (
+                ROOT
+                / "src"
+                / "ensembles"
+                / test_006_runners[experiment_name]
+            ).is_file()
+            return
+
+        suffix = experiment_name.removeprefix("test_002_")
+        assert (ROOT / "src" / "ensembles" / f"train_jh_{suffix}.py").is_file()
+        return
+
+    if "xgb_blend_validation" in config:
+        pipeline_configs = config["xgb_blend_validation"]["members"].values()
+    elif "xgb_internal_fusion_validation" in config:
+        validation_config = config["xgb_internal_fusion_validation"]
+        companion_config = validation_config.get(
+            "companion_preprocessing",
+            validation_config.get("em24_preprocessing"),
+        )
+        pipeline_configs = [
+            validation_config["f9_preprocessing"],
+            companion_config,
+        ]
+    else:
+        pipeline_configs = [config["preprocessing"]]
+
+    for pipeline_config in pipeline_configs:
+        pipeline_name = pipeline_config["name"]
+        assert pipeline_name in PIPELINES
+        pipeline_module = PIPELINES[pipeline_name].__module__
+        module_spec = importlib.util.find_spec(pipeline_module)
+
+        assert module_spec is not None
+        assert module_spec.origin is not None
+        pipeline_path = Path(module_spec.origin).resolve()
+        assert pipeline_path.is_file()
+        assert pipeline_path.is_relative_to((ROOT / "src" / "pipelines").resolve())
 
 
-def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
+def test_shared_sgkf_runner_uses_team_filename() -> None:
+    assert (ROOT / "src" / "train_sgkf.py").is_file()
+    assert not (ROOT / "src" / "train_jh_sgkf.py").exists()
+
+
+def test_test_005_config_matches_selected_em_v30_e4_condition() -> None:
     expected_model = {
         "n_estimators": 500,
         "learning_rate": 0.03,
@@ -62,17 +153,11 @@ def test_test_005_config_matches_selected_em_v19_e4_condition() -> None:
     with (ROOT / "configs" / "test_005.yaml").open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert config["preprocessing"]["name"] == "em_v19"
+    assert config["preprocessing"]["name"] == "em_v30"
     assert {
         key: config["model"][key]
         for key in expected_model
     } == expected_model
-    pipeline_module = PIPELINES[pipeline_name].__module__
-    module_spec = importlib.util.find_spec(pipeline_module)
-
-    assert module_spec is not None
-    assert module_spec.origin is not None
-    assert Path(module_spec.origin).is_file()
 
 
 def test_test_004_config_uses_jsj_v2_pipeline() -> None:
@@ -94,10 +179,28 @@ def test_test_003_config_uses_registered_jyp_pipeline() -> None:
 
     assert config["model"]["name"] == "xgboost"
     pipeline_name = config["preprocessing"]["name"]
-    assert pipeline_name.startswith("jyp_f")
+    assert pipeline_name == "pipeComb_v4"
+    assert config["preprocessing"]["auto_profile_groups"] is True
     assert PIPELINES[pipeline_name].__module__.endswith(
-        f"pipeline_{pipeline_name}"
+        "jyp_preprocessing.pipeline_pipe_comb_v4"
     )
+
+
+def test_only_core_pipecomb_versions_are_selectable_and_jh_is_original() -> None:
+    pipecomb_names = {name for name in PIPELINES if name.startswith("pipeComb_")}
+    pipecomb_files = {
+        path.name
+        for path in (ROOT / "src" / "pipelines" / "jyp_preprocessing").glob(
+            "pipeline_pipe_comb_*.py"
+        )
+    }
+
+    assert pipecomb_names == {"pipeComb_v3", "pipeComb_v4"}
+    assert pipecomb_files == {
+        "pipeline_pipe_comb_v3.py",
+        "pipeline_pipe_comb_v4.py",
+    }
+    assert PIPELINES["jh_v01"].__module__ == "src.pipelines.pipeline_jh_v01"
 
 
 def test_jyp_pipelines_are_self_contained_in_their_dedicated_package() -> None:

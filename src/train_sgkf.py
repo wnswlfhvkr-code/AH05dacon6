@@ -89,11 +89,17 @@ def write_experiment_report(
     feature_min = int(fold_metrics["feature_count"].min())
     feature_max = int(fold_metrics["feature_count"].max())
     feature_mean = float(fold_metrics["feature_count"].mean())
+    train_score_mean = float(fold_metrics["train_macro_f1"].mean())
+    validation_score_mean = float(fold_metrics["validation_macro_f1"].mean())
+    gap_mean = float(fold_metrics["generalization_gap"].mean())
+    gap_max = float(fold_metrics["generalization_gap"].max())
+    overfit_fold_count = int((fold_metrics["generalization_gap"] > 0.10).sum())
     elapsed = finished_at - started_at
 
     seed_table = dataframe_to_markdown(seed_metrics)
     fold_columns = [
-        "seed", "fold", "feature_count", "macro_f1",
+        "seed", "fold", "feature_count", "train_macro_f1",
+        "validation_macro_f1", "generalization_gap",
         "converged", "elapsed_seconds",
     ]
     fold_table = dataframe_to_markdown(fold_metrics[fold_columns])
@@ -111,6 +117,11 @@ def write_experiment_report(
 | 학습 데이터 행 수 | {train_rows} |
 | Fold 피처 수 | 평균 {feature_mean:.1f}, 범위 {feature_min}~{feature_max} |
 | OOF Macro F1 | {mean_score:.6f} ± {std_score:.6f} |
+| Fold Train Macro F1 평균 | {train_score_mean:.6f} |
+| Fold Validation Macro F1 평균 | {validation_score_mean:.6f} |
+| 평균 generalization gap | {gap_mean:+.6f} |
+| 최대 generalization gap | {gap_max:+.6f} |
+| 과적합 경고 Fold (gap > 0.10) | {overfit_fold_count}/{len(fold_metrics)} |
 | 설정 파일 | `{config_path}` |
 | 제출 파일 | `{submission_path}` |
 | 요약 JSON | `{summary_path}` |
@@ -150,7 +161,7 @@ def main() -> None:
     pipeline_name = str(feature_config.get("name", ""))
     if not pipeline_name.startswith("jh_v"):
         raise ValueError(
-            "train_jh_sgkf.py는 jh_v 전처리만 지원합니다: "
+            "train_sgkf.py는 jh_v 전처리만 지원합니다: "
             f"{pipeline_name!r}"
         )
     model_name = str(config["model"].get("name", ""))
@@ -193,30 +204,68 @@ def main() -> None:
     seeds = [int(seed) for seed in validation_config["seeds"]]
     strata, burden_bins = make_class_burden_strata(labels, mutation_burden, n_splits)
 
+    fixed_folds: dict[int, np.ndarray] | None = None
+    fixed_split_value = validation_config.get("fixed_split_file")
+    if fixed_split_value:
+        fixed_split_path = Path(fixed_split_value)
+        if not fixed_split_path.exists():
+            raise FileNotFoundError(
+                f"고정 split 파일이 없습니다: {fixed_split_path}"
+            )
+        fixed_frame = pd.read_csv(fixed_split_path)
+        if not np.array_equal(
+            fixed_frame[id_column].astype(str).to_numpy(),
+            train[id_column].astype(str).to_numpy(),
+        ):
+            raise ValueError("Train과 고정 split의 ID 순서가 다릅니다.")
+        fixed_folds = {}
+        for seed in seeds:
+            column = f"fold_seed_{seed}"
+            if column not in fixed_frame:
+                raise ValueError(f"고정 split에 {column} 열이 없습니다.")
+            fold_ids = fixed_frame[column].to_numpy(dtype=np.int8)
+            if set(np.unique(fold_ids)) != set(range(n_splits)):
+                raise ValueError(f"seed={seed} fold 값이 잘못되었습니다.")
+            fixed_folds[seed] = fold_ids
+
     fold_rows: list[dict] = []
     seed_rows: list[dict] = []
     class_frames: list[pd.DataFrame] = []
     burden_rows: list[dict] = []
     oof_rows: list[pd.DataFrame] = []
     test_score_sum = np.zeros((len(test), n_classes), dtype=np.float64)
+    test_scores_by_model: list[np.ndarray] = []
     oof_scores_by_seed: list[np.ndarray] = []
     score_kind: str | None = None
     model_count = 0
 
     for seed in seeds:
-        splitter = StratifiedGroupKFold(
-            n_splits=n_splits,
-            shuffle=True,
-            random_state=seed,
-        )
+        if fixed_folds is None:
+            splitter = StratifiedGroupKFold(
+                n_splits=n_splits,
+                shuffle=True,
+                random_state=seed,
+            )
+            split_iterator = splitter.split(
+                np.zeros(len(train)), strata, profile_groups,
+            )
+        else:
+            split_iterator = (
+                (
+                    np.flatnonzero(fixed_folds[seed] != fold),
+                    np.flatnonzero(fixed_folds[seed] == fold),
+                )
+                for fold in range(n_splits)
+            )
         oof_score = np.zeros((len(train), n_classes), dtype=np.float64)
         oof_seen = np.zeros(len(train), dtype=bool)
 
-        for fold, (train_index, valid_index) in enumerate(splitter.split(
-            np.zeros(len(train)), strata, profile_groups,
-        )):
+        for fold, (train_index, valid_index) in enumerate(split_iterator):
             started = time.time()
-            preprocessor = create_preprocessing_pipeline(feature_config)
+            fold_feature_config = dict(feature_config)
+            if "svd_random_state" in fold_feature_config:
+                fold_feature_config["svd_random_state"] = seed
+            preprocessor = create_preprocessing_pipeline(fold_feature_config)
             train_matrix = preprocessor.fit_transform(
                 train_features.iloc[train_index],
                 labels.iloc[train_index],
@@ -225,28 +274,62 @@ def main() -> None:
             test_matrix = preprocessor.transform(test_features)
             feature_summary = preprocessor.summary()
 
-            model = model_builder(config["model"], seed + fold)
+            model_seed = (
+                seed + fold
+                if bool(config["model"].get("seed_plus_fold", True))
+                else seed
+            )
+            model = model_builder(config["model"], model_seed)
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always", ConvergenceWarning)
-                model.fit(train_matrix, y[train_index])
+                early_stopping_rounds = int(
+                    config["model"].get("early_stopping_rounds", 0)
+                )
+                if model_name == "lightgbm" and early_stopping_rounds > 0:
+                    from lightgbm import early_stopping, log_evaluation
+
+                    model.fit(
+                        train_matrix,
+                        y[train_index],
+                        eval_set=[(valid_matrix, y[valid_index])],
+                        eval_metric=config["model"].get(
+                            "eval_metric", "multi_logloss"
+                        ),
+                        callbacks=[
+                            early_stopping(early_stopping_rounds, verbose=False),
+                            log_evaluation(0),
+                        ],
+                    )
+                else:
+                    model.fit(train_matrix, y[train_index])
             converged = not any(issubclass(item.category, ConvergenceWarning) for item in caught)
 
+            train_score, train_score_kind = model_scores(model, train_matrix)
             valid_score, current_score_kind = model_scores(model, valid_matrix)
+            if train_score_kind != current_score_kind:
+                raise RuntimeError("Train/Validation 모델 출력 종류가 다릅니다.")
             if score_kind is None:
                 score_kind = current_score_kind
             elif score_kind != current_score_kind:
                 raise RuntimeError("폴드마다 모델 출력 종류가 다릅니다.")
+            train_prediction = model.classes_[train_score.argmax(axis=1)]
             valid_prediction = model.classes_[valid_score.argmax(axis=1)]
-            fold_score = f1_score(
+            train_fold_score = f1_score(
+                y[train_index], train_prediction,
+                labels=np.arange(n_classes), average="macro", zero_division=0,
+            )
+            validation_fold_score = f1_score(
                 y[valid_index], valid_prediction,
                 labels=np.arange(n_classes), average="macro", zero_division=0,
             )
+            generalization_gap = train_fold_score - validation_fold_score
             oof_score[valid_index] = valid_score
             oof_seen[valid_index] = True
             test_score, test_score_kind = model_scores(model, test_matrix)
             if test_score_kind != score_kind:
                 raise RuntimeError("Validation/Test 모델 출력 종류가 다릅니다.")
             test_score_sum += test_score
+            test_scores_by_model.append(test_score.copy())
             model_count += 1
             fold_row = {
                 "seed": seed,
@@ -255,15 +338,24 @@ def main() -> None:
                 "train_rows": len(train_index),
                 "valid_rows": len(valid_index),
                 "feature_count": train_matrix.shape[1],
-                "macro_f1": float(fold_score),
+                "macro_f1": float(validation_fold_score),
+                "train_macro_f1": float(train_fold_score),
+                "validation_macro_f1": float(validation_fold_score),
+                "generalization_gap": float(generalization_gap),
                 "converged": converged,
-                "max_n_iter": int(np.max(model.n_iter_)),
+                "max_n_iter": int(np.max(np.atleast_1d(getattr(
+                    model,
+                    "n_iter_",
+                    getattr(model, "best_iteration_", 0),
+                )))),
                 "elapsed_seconds": time.time() - started,
             }
             fold_row.update(feature_summary)
             fold_rows.append(fold_row)
             print(
-                f"seed={seed} fold={fold} Macro F1={fold_score:.6f} "
+                f"seed={seed} fold={fold} Train={train_fold_score:.6f} "
+                f"Validation={validation_fold_score:.6f} "
+                f"Gap={generalization_gap:+.6f} "
                 f"features={train_matrix.shape[1]} converged={converged}"
             )
 
@@ -314,6 +406,11 @@ def main() -> None:
     oof_predictions = pd.concat(oof_rows, ignore_index=True)
     mean_score = float(seed_metrics["oof_macro_f1"].mean())
     std_score = float(seed_metrics["oof_macro_f1"].std(ddof=1))
+    train_score_mean = float(fold_metrics["train_macro_f1"].mean())
+    validation_score_mean = float(fold_metrics["validation_macro_f1"].mean())
+    gap_mean = float(fold_metrics["generalization_gap"].mean())
+    gap_max = float(fold_metrics["generalization_gap"].max())
+    overfit_fold_count = int((fold_metrics["generalization_gap"] > 0.10).sum())
 
     test_mean_score = test_score_sum / model_count
     submission = pd.read_csv(raw_dir / data_config["submission_file"])
@@ -328,6 +425,13 @@ def main() -> None:
     score_prefix = "probability" if score_kind == "probability" else "decision"
     np.save(output_dir / f"oof_{score_prefix}_by_seed.npy", np.stack(oof_scores_by_seed))
     np.save(output_dir / f"test_{score_prefix}_mean.npy", test_mean_score)
+    test_scores_by_seed_fold = np.stack(test_scores_by_model).reshape(
+        len(seeds), n_splits, len(test), n_classes,
+    )
+    np.save(
+        output_dir / f"test_{score_prefix}_by_seed_fold.npy",
+        test_scores_by_seed_fold,
+    )
     pd.DataFrame({
         "class_index": np.arange(n_classes),
         target_column: class_names,
@@ -346,6 +450,12 @@ def main() -> None:
         "model_count": model_count,
         "oof_macro_f1_mean": mean_score,
         "oof_macro_f1_std": std_score,
+        "train_macro_f1_mean": train_score_mean,
+        "validation_macro_f1_mean": validation_score_mean,
+        "generalization_gap_mean": gap_mean,
+        "generalization_gap_max": gap_max,
+        "overfit_warning_threshold": 0.10,
+        "overfit_warning_fold_count": overfit_fold_count,
         "submission": str(submission_path),
         "feature_config": feature_config,
     }

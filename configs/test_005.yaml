@@ -28,6 +28,7 @@ data:
 #   eval_metric: mlogloss
 #   tree_method: hist
 
+
 # [E4 조건]
 model:
   name: xgboost
@@ -43,6 +44,7 @@ model:
   n_jobs: -1
   eval_metric: mlogloss
   tree_method: hist
+  device: cuda
   
 
 training:

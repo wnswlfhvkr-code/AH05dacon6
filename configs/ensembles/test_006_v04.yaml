@@ -1,0 +1,35 @@
+project:
+  experiment_name: test_006_v04
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  e10_dir: data/processed/test_006_v03
+  em16_dir: data/processed/test_006_v02_em16
+  em24_dir: data/processed/test_006_v04_em24
+  em16_oof_file: em16_sgkf_oof_probability_by_seed.npy
+  em16_test_file: em16_sgkf_test_probability_by_seed_fold.npy
+  em24_oof_file: em24_sgkf_oof_probability_by_seed.npy
+  em24_test_file: em24_sgkf_test_probability_by_seed_fold.npy
+  output_dir: data/processed/test_006_v04
+
+validation:
+  n_splits: 3
+  seeds: [42, 2026, 777]
+
+ensemble:
+  em16_mix_weights: [0.00, 0.40, 0.75, 1.00]
+  team_temperatures: [1.00, 1.75, 2.50]
+  kirc_pair_weights: [0.00, 0.15, 0.25, 0.35]
+  lgg_pair_weights: [0.00, 0.15, 0.25, 0.30]
+  pair_right_offsets:
+    KIRC_KIPAN: 0.50
+    LGG_GBMLGG: 0.30
+  bootstrap_repeats: 3000
+  bootstrap_seed: 20260806
+  require_all_seeds_improved: true

@@ -1,0 +1,32 @@
+project:
+  experiment_name: test_006_v02
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  e7_dir: data/processed/test_002_v08
+  e8_dir: data/processed/test_002_v09
+  e8a_dir: data/processed/test_006
+  em16_dir: data/processed/test_006_v02_em16
+  em16_oof_files:
+    - em16_sgkf_oof_probability_by_seed.npy
+  em16_test_files:
+    - em16_sgkf_test_probability_by_seed_fold.npy
+  output_dir: data/processed/test_006_v02
+
+validation:
+  n_splits: 3
+  seeds: [42, 2026, 777]
+
+ensemble:
+  aligned_by_seed_fold: true
+  temperatures: [0.50, 0.75, 1.00, 1.25, 1.50, 2.00]
+  weights: [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40]
+  bootstrap_repeats: 3000
+  bootstrap_seed: 20260804
+  require_all_seeds_improved: true
