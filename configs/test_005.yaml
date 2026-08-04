@@ -44,7 +44,7 @@ model:
   n_jobs: -1
   eval_metric: mlogloss
   tree_method: hist
-  
+  device: cuda
   
 
 training:

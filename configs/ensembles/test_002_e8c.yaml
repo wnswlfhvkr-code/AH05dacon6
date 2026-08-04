@@ -11,7 +11,7 @@ data:
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
   e7_dir: data/processed/test_002_v08
   e8_dir: data/processed/test_002_v09
-  e8a_dir: data/processed/test_002_e8a
+  e8a_dir: data/processed/test_006
   em16_dir: data/processed/test_002_e8c_em16
   em16_oof_files:
     - em16_sgkf_oof_probability_by_seed.npy

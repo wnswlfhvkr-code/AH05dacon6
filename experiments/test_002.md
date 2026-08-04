@@ -82,10 +82,10 @@ Test 예측은 SKCM 20.42%, ACC 6.95%, COAD 11.70%로 Train 비율보다 높았�
 ## 실행
 
 ```bash
-python -m src.train_jh_sgkf --config configs/test_002.yaml
+python -m src.train_sgkf --config configs/test_002.yaml
 ```
 
-기존 `src.train_v01`은 `src.train_jh_sgkf`로 통합되었다. `configs/test_002.yaml`은 최신 실험 설정을 가리키므로 이 과거 실험을 재현할 때는 보고서의 v01 전처리·모델 설정으로 변경해야 한다. 산출물은 `data/processed/`에 저장되며 `.gitignore`에 의해 GitHub에는 포함되지 않는다.
+기존 `src.train_v01`은 `src.train_sgkf`로 통합되었다. `configs/test_002.yaml`은 최신 실험 설정을 가리키므로 이 과거 실험을 재현할 때는 보고서의 v01 전처리·모델 설정으로 변경해야 한다. 산출물은 `data/processed/`에 저장되며 `.gitignore`에 의해 GitHub에는 포함되지 않는다.
 
 ## 재실행 결과
 

@@ -194,7 +194,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/ensembles/test_002_e8a.yaml"),
+        default=Path("configs/test_006.yaml"),
     )
     args = parser.parse_args()
     config = load_config(args.config)
@@ -232,9 +232,27 @@ def main() -> None:
             f"expected={expected_oof_shape}"
         )
 
-    folds = reconstruct_folds(
-        train[gene_columns], labels, seeds, n_splits,
-    )
+    fixed_split_value = data.get("fixed_split_file")
+    if fixed_split_value:
+        fixed_split = pd.read_csv(Path(fixed_split_value))
+        if not np.array_equal(
+            fixed_split[id_column].astype(str).to_numpy(),
+            train[id_column].astype(str).to_numpy(),
+        ):
+            raise ValueError("Train과 고정 split의 ID 순서가 다릅니다.")
+        folds = {}
+        for seed in seeds:
+            column = f"fold_seed_{seed}"
+            if column not in fixed_split:
+                raise ValueError(f"고정 split에 {column} 열이 없습니다.")
+            fold_ids = fixed_split[column].to_numpy(dtype=np.int8)
+            if set(np.unique(fold_ids)) != set(range(n_splits)):
+                raise ValueError(f"seed={seed} fold 값이 잘못되었습니다.")
+            folds[seed] = fold_ids
+    else:
+        folds = reconstruct_folds(
+            train[gene_columns], labels, seeds, n_splits,
+        )
     e8a_prediction, selected = select_crossfit_parameters(
         y=y,
         e7_oof=e7_oof,
@@ -293,11 +311,14 @@ def main() -> None:
     seed_metrics.to_csv(output_dir / "seed_oof_metrics.csv", index=False)
     np.save(output_dir / "oof_predictions_by_seed.npy", e8a_prediction)
     np.save(output_dir / "test_probability_mean.npy", test_probability)
-    submission.to_csv(output_dir / "submission_test_002_e8a.csv", index=False)
+    experiment_name = config["project"]["experiment_name"]
+    submission.to_csv(
+        output_dir / f"submission_{experiment_name}.csv", index=False,
+    )
     pd.DataFrame({
         "class_index": np.arange(n_classes), target: class_names,
     }).to_csv(output_dir / "class_order.csv", index=False)
-    (output_dir / "e8a_summary.json").write_text(
+    (output_dir / f"{experiment_name}_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8",
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
