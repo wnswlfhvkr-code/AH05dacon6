@@ -2,18 +2,18 @@
 
 | 항목 | 결과 |
 | --- | --- |
-| 실행 시각 | 2026-08-03T17:27:14+09:00 |
+| 실행 시각 | 2026-08-03T21:26:04+09:00 |
 | 모델 | xgboost |
-| 전처리 파이프라인 | em_v43 |
+| 전처리 파이프라인 | em_v24 |
 | 선택된 최소 변이 횟수 | 5 |
 | 학습 데이터 행 수 | 6201 |
-| 피처 수 | 4720 |
-| 최종 Macro F1 | 0.418057 |
-| 80% 학습 Macro F1 | 0.571415 |
-| 20% 검증 Macro F1 | 0.420384 |
-| 과적합 격차 | 0.151031 |
+| 피처 수 | 4660 |
+| 최종 Macro F1 | 0.418177 |
+| 80% 학습 Macro F1 | 0.568306 |
+| 20% 검증 Macro F1 | 0.417547 |
+| 과적합 격차 | 0.150759 |
 | 과적합 여부 | True |
-| 설정 파일 | `configs/test_043.yaml` |
+| 설정 파일 | `configs/test_005.yaml` |
 | 제출 파일 | `data/processed/test_005_submission.csv` |
 | 모델 아티팩트 | `models/test_005.pkl` |
 
@@ -38,7 +38,7 @@ tree_method: hist
 ## 전처리 설정
 
 ```yaml
-name: em_v43
+name: em_v24
 min_mutation_count: 5
 top_genes_per_class: 20
 smoothing: 0.5

@@ -71,6 +71,13 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
+    pipeline_name = config["preprocessing"]["name"]
+    assert pipeline_name in PIPELINES
+    pipeline_module = PIPELINES[pipeline_name].__module__
+    module_spec = importlib.util.find_spec(pipeline_module)
+    assert module_spec is not None
+    assert module_spec.origin is not None
+    assert Path(module_spec.origin).is_file()
     if config_path.name == "test_006.yaml":
         assert config["project"]["experiment_name"].startswith("test_006")
         assert (ROOT / "src" / "ensembles").is_dir()

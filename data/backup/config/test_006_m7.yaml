@@ -1,0 +1,57 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_006_m7
+  seed: 42
+  python_version: "3.12"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: muat
+
+  # 현재 CSV에는 DNA motif·genomic position·strand가 없음을 명시한 축소 모드
+  input_mode: protein_proxy
+  allow_proxy_mode: true
+
+  # 표본별 개별 유전자-단백질 변이 범주 token 샘플링
+  mutation_sampling_size: 128
+  variant_hash_size: 65536
+  gene_embedding_dim: 64
+  variant_embedding_dim: 32
+
+  # mutation-level self-attention과 SUBCLASS 분류 헤드
+  model_dim: 128
+  num_layers: 2
+  num_heads: 4
+  hidden_dim: 64
+  dropout: 0.25
+
+  epochs: 30
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  batch_size: 64
+  num_workers: 0
+  gradient_clip_norm: 1.0
+  label_smoothing: 0.05
+  class_weight: balanced
+  early_stopping_rounds: 5
+  device: auto
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  overfit_threshold: 0.1
+
+preprocessing:
+  # exact 단백질 변이 범주를 보존하고 WT를 0으로 이동한 희소 행렬
+  name: jyp_raw
+  show_progress: true
+  progress_interval: 25000
