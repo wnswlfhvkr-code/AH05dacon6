@@ -20,6 +20,7 @@ def create_model(model_config: dict, seed: int):
         max_depth=model_config.get("max_depth", -1),
         min_child_samples=model_config.get("min_child_samples", 20),
         subsample=model_config.get("subsample", 1.0),
+        subsample_freq=model_config.get("subsample_freq", 0),
         colsample_bytree=model_config.get("colsample_bytree", 1.0),
         reg_alpha=model_config.get("reg_alpha", 0.0),
         reg_lambda=model_config.get("reg_lambda", 0.0),
@@ -27,4 +28,5 @@ def create_model(model_config: dict, seed: int):
         random_state=seed,
         n_jobs=model_config.get("n_jobs", -1),
         verbosity=model_config.get("verbosity", -1),
+        device_type=model_config.get("device_type", "cpu"),
     )
