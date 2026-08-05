@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_005
+  description: "OOF temperature 보정과 제약형 log-probability blending"
   seed: 42
   python_version: "3.14"
 
@@ -23,10 +23,20 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  ensemble_method: constrained_log_blend
   early_stopping_fraction: 0.15
-  text_temperature: 1.20
-  xgboost_temperature: 1.15
-  lightgbm_temperature: 1.15
+  text_temperature: 1.0
+  xgboost_temperature: 1.0
+  lightgbm_temperature: 1.0
+  constrained_log_blend:
+    temperature_candidates: [0.8, 1.0, 1.2, 1.4, 1.6, 2.0]
+    initial_weights: [0.50, 0.25, 0.25]
+    weight_bounds:
+      text: [0.30, 0.70]
+      xgboost: [0.10, 0.45]
+      third: [0.10, 0.45]
+    weight_l2: 0.01
+    max_iter: 300
   text_linear_svc:
     C: 0.10
     class_weight: balanced
@@ -117,7 +127,7 @@ preprocessing:
 experiment_design:
   components: [EMV46, JSJ9]
   ensemble_model: [LinearSVC, XGBoost, LightGBM]
-  ensemble_method: single_level_cross_fitted_regularized_stacking
+  ensemble_method: oof_calibrated_constrained_log_probability_blending
   combined_input: model_specific_text_tree_bundle
   emv46_features_used: true
   jsj9_text_features_used: true
@@ -145,4 +155,14 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: oof_calibrated_constrained_log_probability_blending
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2
+  change_only: ensemble_combiner
+  calibration_source: inner_oof_probabilities_only
+  calibration: temperature_grid_search
+  combiner: constrained_log_probability_pool
+  nonnegative_weights: true
+  weights_sum_to_one: true
+  meta_learner_used: false

@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_004
+  description: "fold-train 제곱근·clipping 클래스 가중치를 적용한 OOF stacking"
   seed: 42
   python_version: "3.14"
 
@@ -23,6 +23,8 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  class_weight_mode: sqrt_balanced
+  class_weight_clip: [0.75, 2.5]
   early_stopping_fraction: 0.15
   text_temperature: 1.20
   xgboost_temperature: 1.15
@@ -145,4 +147,13 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: fold_local_sqrt_clipped_class_weights
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2
+  change_only: class_weight_relaxation
+  weight_source: current_inner_fold_train_labels_only
+  formula: sqrt(n_samples / (n_classes * class_count))
+  clipping: [0.75, 2.5]
+  applied_to: [LinearSVC, meta_learner]
+

@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_006
+  description: "LightGBM을 CatBoost로 교체한 LinearSVC·XGBoost·CatBoost OOF stacking"
   seed: 42
   python_version: "3.14"
 
@@ -23,10 +23,11 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  third_model: catboost
   early_stopping_fraction: 0.15
   text_temperature: 1.20
   xgboost_temperature: 1.15
-  lightgbm_temperature: 1.15
+  catboost_temperature: 1.15
   text_linear_svc:
     C: 0.10
     class_weight: balanced
@@ -48,20 +49,20 @@ model:
     tree_method: hist
     n_jobs: -1
     early_stopping_rounds: 30
-  emv46_lightgbm:
-    objective: multiclass
-    n_estimators: 280
+  emv46_catboost:
+    loss_function: MultiClass
+    eval_metric: MultiClass
+    iterations: 350
     learning_rate: 0.025
-    num_leaves: 11
-    max_depth: 4
-    min_child_samples: 45
+    depth: 4
+    l2_leaf_reg: 18.0
+    random_strength: 1.0
+    bootstrap_type: Bernoulli
     subsample: 0.75
-    subsample_freq: 1
-    colsample_bytree: 0.50
-    reg_alpha: 2.0
-    reg_lambda: 18.0
-    n_jobs: -1
-    verbosity: -1
+    rsm: 0.50
+    thread_count: -1
+    verbose: false
+    allow_writing_files: false
     early_stopping_rounds: 30
   meta_learner:
     C: 0.03
@@ -116,7 +117,7 @@ preprocessing:
 
 experiment_design:
   components: [EMV46, JSJ9]
-  ensemble_model: [LinearSVC, XGBoost, LightGBM]
+  ensemble_model: [LinearSVC, XGBoost, CatBoost]
   ensemble_method: single_level_cross_fitted_regularized_stacking
   combined_input: model_specific_text_tree_bundle
   emv46_features_used: true
@@ -145,4 +146,12 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: replace_lightgbm_with_catboost
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2
+  change_only: third_base_learner
+  replaced_model: LightGBM
+  replacement_model: CatBoost
+  early_stopping_split_source: inner_train_only
+

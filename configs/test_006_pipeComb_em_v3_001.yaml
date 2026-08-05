@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v3_001
+  description: "pipeComb_em_v3에 v2_010 검증 완료 안정화 설정을 이식"
   seed: 42
   python_version: "3.14"
 
@@ -23,12 +23,15 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  class_weight_mode: sqrt_balanced
+  class_weight_power: 0.25
+  class_weight_clip: [0.90, 1.60]
   early_stopping_fraction: 0.15
-  text_temperature: 1.20
+  text_temperature: 1.35
   xgboost_temperature: 1.15
   lightgbm_temperature: 1.15
   text_linear_svc:
-    C: 0.10
+    C: 0.05
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
@@ -64,7 +67,7 @@ model:
     verbosity: -1
     early_stopping_rounds: 30
   meta_learner:
-    C: 0.03
+    C: 0.015
     solver: lbfgs
     class_weight: balanced
     max_iter: 3000
@@ -81,15 +84,15 @@ training:
   target_train_macro_f1_max: 0.70
 
 preprocessing:
-  name: pipeComb_em_v2
+  name: pipeComb_em_v3
   text_parameters:
     word_ngram_range: [1, 2]
-    word_min_df: 3
-    word_max_features: 180000
+    word_min_df: 4
+    word_max_features: 160000
     char_ngram_range: [3, 5]
-    char_min_df: 4
-    char_max_features: 120000
-    char_weight: 0.4
+    char_min_df: 6
+    char_max_features: 100000
+    char_weight: 0.30
     split_multi_event: false
   emv46_parameters:
     min_mutation_count: 5
@@ -113,9 +116,20 @@ preprocessing:
       F17: {top_genes_per_class: 20}
       F18: {top_genes_per_class: 20}
       F19: {top_genes_per_class: 20}
+  jyp9_parameters:
+    f7_pairs: [[KIRC, KIPAN], [LGG, GBMLGG]]
+    f7_top_k_per_direction: 3
+    f7_min_gene_support: 10
+    f7_laplace_alpha: 4.0
+    f7_burden_quantiles: 5
+    f7_stability_folds: 5
+    f7_min_direction_consistency: 4
+    f7_min_selection_frequency: 3
+    f7_oof_folds: 5
+    f7_random_state: 42
 
 experiment_design:
-  components: [EMV46, JSJ9]
+  components: [EMV46, JSJ9, JYP9]
   ensemble_model: [LinearSVC, XGBoost, LightGBM]
   ensemble_method: single_level_cross_fitted_regularized_stacking
   combined_input: model_specific_text_tree_bundle
@@ -123,6 +137,11 @@ experiment_design:
   jsj9_text_features_used: true
   jsj9_tree_features_used: false
   duplicate_jsj9_tree_removed: true
+  jyp9_features_used: [F7_pair_contrast, F9_global_aa_pair_log1p]
+  jyp9_fixed_feature_count: 384
+  jyp9_duplicate_blocks_removed: [F0, F1, F2, F3_position, F3_aa, F4]
+  jyp9_mutation_matrix_reused_from_emv46: true
+  jyp9_full_rescan_removed: true
   duplicate_emv46_count: 1
   outer_oof_enabled: false
   outer_evaluation_folds: 1
@@ -145,4 +164,19 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: transplant_v2_010_stabilization_into_pipecomb_em_v3
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v3
+  change_only: validated_v2_010_regularization
+  preserved_components: [EMV46, JSJ9, JYP9_F7, JYP9_F9, XGBoost, LightGBM]
+  changed_components: [class_weights, LinearSVC, meta_learner, text_vocabulary]
+  test_fit_used: false
+
+improvement_target:
+  source_v2_010_validation_macro_f1: 0.561718
+  source_v2_010_train_macro_f1: 0.791425
+  source_v2_010_overfit_gap: 0.229708
+  objective: retain_v3_jyp_features_with_lower_text_and_meta_variance
+  primary_pairs: [[KIRC, KIPAN], [LGG, GBMLGG]]
+  overfit_control: stable_gene_selection_and_oof_pair_features

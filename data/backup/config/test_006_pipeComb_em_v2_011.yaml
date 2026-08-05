@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_011
+  description: "v2_010의 검증 성능을 유지하면서 tree 복잡도와 확률 과신을 완화한 stacking"
   seed: 42
   python_version: "3.14"
 
@@ -23,48 +23,53 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
-  early_stopping_fraction: 0.15
-  text_temperature: 1.20
-  xgboost_temperature: 1.15
-  lightgbm_temperature: 1.15
+  class_weight_mode: sqrt_balanced
+  class_weight_power: 0.25
+  class_weight_clip: [0.90, 1.60]
+  early_stopping_fraction: 0.20
+  text_temperature: 1.35
+  xgboost_temperature: 1.20
+  lightgbm_temperature: 1.20
   text_linear_svc:
-    C: 0.10
+    C: 0.05
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
     dual: auto
   emv46_xgboost:
     objective: multi:softprob
-    n_estimators: 350
-    learning_rate: 0.025
+    n_estimators: 450
+    learning_rate: 0.020
     max_depth: 3
-    min_child_weight: 8.0
-    subsample: 0.75
-    colsample_bytree: 0.55
-    reg_alpha: 1.5
-    reg_lambda: 15.0
+    min_child_weight: 12.0
+    subsample: 0.70
+    colsample_bytree: 0.45
+    gamma: 0.05
+    reg_alpha: 2.5
+    reg_lambda: 22.0
     max_delta_step: 1.0
     eval_metric: mlogloss
     tree_method: hist
     n_jobs: -1
-    early_stopping_rounds: 30
+    early_stopping_rounds: 40
   emv46_lightgbm:
     objective: multiclass
-    n_estimators: 280
-    learning_rate: 0.025
-    num_leaves: 11
-    max_depth: 4
-    min_child_samples: 45
-    subsample: 0.75
+    n_estimators: 360
+    learning_rate: 0.020
+    num_leaves: 9
+    max_depth: 3
+    min_child_samples: 60
+    subsample: 0.70
     subsample_freq: 1
-    colsample_bytree: 0.50
-    reg_alpha: 2.0
-    reg_lambda: 18.0
+    colsample_bytree: 0.45
+    min_split_gain: 0.02
+    reg_alpha: 3.0
+    reg_lambda: 25.0
     n_jobs: -1
     verbosity: -1
-    early_stopping_rounds: 30
+    early_stopping_rounds: 40
   meta_learner:
-    C: 0.03
+    C: 0.015
     solver: lbfgs
     class_weight: balanced
     max_iter: 3000
@@ -84,12 +89,12 @@ preprocessing:
   name: pipeComb_em_v2
   text_parameters:
     word_ngram_range: [1, 2]
-    word_min_df: 3
-    word_max_features: 180000
+    word_min_df: 4
+    word_max_features: 160000
     char_ngram_range: [3, 5]
-    char_min_df: 4
-    char_max_features: 120000
-    char_weight: 0.4
+    char_min_df: 6
+    char_max_features: 100000
+    char_weight: 0.30
     split_multi_event: false
   emv46_parameters:
     min_mutation_count: 5
@@ -132,8 +137,8 @@ experiment_design:
   expected_base_model_fit_count: 36
   nested_cross_validation_removed: true
   early_stopping_split_source: inner_train_only
-  early_stopping_fraction: 0.15
-  early_stopping_rounds: 30
+  early_stopping_fraction: 0.20
+  early_stopping_rounds: 40
   oof_fold_used_for_early_stopping: false
   fit_preprocessing_within_fold: true
   preserve_original_subclass: true
@@ -145,4 +150,43 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: regularize_tree_learners_and_soften_tree_probabilities
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2_010
+  change_only: tree_generalization_and_probability_softening
+  preserved_from_baseline:
+    - class_weight_power
+    - class_weight_clip
+    - text_vectorization
+    - linear_svc_regularization
+    - meta_learner_regularization
+    - emv46_preprocessing
+  changed_components: [XGBoost, LightGBM, tree_temperature, early_stopping]
+
+improvement_target:
+  source_validation_macro_f1: 0.561718
+  source_train_macro_f1: 0.791425
+  source_overfit_gap: 0.229708
+  target_validation_macro_f1_floor: 0.561
+  target_overfit_gap_max: 0.20
+  objective: preserve_v010_validation_f1_while_reducing_tree_variance_and_train_gap
+
+regularization_changes:
+  early_stopping_fraction: [0.15, 0.20]
+  early_stopping_rounds: [30, 40]
+  xgboost_temperature: [1.15, 1.20]
+  xgboost_learning_rate: [0.025, 0.020]
+  xgboost_min_child_weight: [8.0, 12.0]
+  xgboost_subsample: [0.75, 0.70]
+  xgboost_colsample_bytree: [0.55, 0.45]
+  xgboost_reg_alpha: [1.5, 2.5]
+  xgboost_reg_lambda: [15.0, 22.0]
+  lightgbm_temperature: [1.15, 1.20]
+  lightgbm_learning_rate: [0.025, 0.020]
+  lightgbm_num_leaves: [11, 9]
+  lightgbm_max_depth: [4, 3]
+  lightgbm_min_child_samples: [45, 60]
+  lightgbm_colsample_bytree: [0.50, 0.45]
+  lightgbm_reg_alpha: [2.0, 3.0]
+  lightgbm_reg_lambda: [18.0, 25.0]

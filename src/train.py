@@ -205,10 +205,13 @@ def select_min_mutation_count(
         "em_v19": "min_functional_mutation_count",
         "em_v20": "min_functional_mutation_count",
         "em_G01": "min_active_count",
-        "em_G02": "min_active_count",
-        "em_G03": "min_active_count",
-        "em_G04": "min_active_count",
-        "em_G05": "min_active_count",
+        "em_H01": "min_mutation_count",
+        "em_H02": "min_mutation_count",
+        "em_H03": "min_mutation_count",
+        "em_H04": "min_mutation_count",
+        "em_H05": "min_mutation_count",
+        "em_H06": "min_mutation_count",
+        "em_H07": "min_mutation_count",
     }
     parameter_name = parameter_by_pipeline.get(pipeline_name)
     if parameter_name is None or not tuning_config.get("enabled", False):

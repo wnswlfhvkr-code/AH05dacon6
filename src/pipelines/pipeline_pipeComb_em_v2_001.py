@@ -1,4 +1,4 @@
-"""EMV46 수치 피처와 JSJ9 텍스트 피처를 단일 파일로 통합한 pipeComb EM v2."""
+"""EMV46·JSJ9 통합 로직을 Outer 5-fold 실험에 적용한 pipeComb EM v2_001."""
 
 from __future__ import annotations
 
@@ -1455,11 +1455,12 @@ class _JSJ9TextOnlyEngine:
         )
 
 
-class PipeCombEMV2PreprocessingPipeline(PreprocessingPipeline):
+class PipeCombEMV2001PreprocessingPipeline(PreprocessingPipeline):
     """통합 EMV46 수치 뷰와 JSJ9 TF-IDF 텍스트 뷰를 반환합니다."""
 
-    name = "pipeComb_em_v2"
-    evaluation_folds = 1
+    name = "pipeComb_em_v2_001"
+    # v2와 달리 Outer 5-fold 평가를 유지하는 비교 실험입니다.
+    evaluation_folds = 5
 
     def __init__(
         self,
@@ -1482,7 +1483,7 @@ class PipeCombEMV2PreprocessingPipeline(PreprocessingPipeline):
             "JSJ9 Word·Char TF-IDF 문서·행렬 1회 생성",
             "중복 JSJ9 tree 생성 경로 제거",
             "LinearSVC text·XGBoost/LightGBM tree 뷰 분리",
-            "단일 레벨 OOF stacking 입력 제공",
+            "Outer 5-fold·Inner 5-fold 중첩 OOF stacking 입력 제공",
             "fold-train에서만 모든 상태 fit",
             "원본 SUBCLASS 유지",
         )
@@ -1514,7 +1515,7 @@ class PipeCombEMV2PreprocessingPipeline(PreprocessingPipeline):
         self,
         features: pd.DataFrame,
         labels: pd.Series,
-    ) -> "PipeCombEMV2PreprocessingPipeline":
+    ) -> "PipeCombEMV2001PreprocessingPipeline":
         self.feature_columns = features.columns.tolist()
         self.emv46_pipeline.fit(features, labels)
         self.jsj9_text_engine.fit(features)

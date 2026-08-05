@@ -1,6 +1,6 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
+  experiment_name: test_006_pipeComb_em_v2_002
   description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
   seed: 42
   python_version: "3.14"

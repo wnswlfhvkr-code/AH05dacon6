@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v3_002
+  description: "pipeComb_em_v3의 JYP9 F7 선택 안정성을 강화한 독립 실험"
   seed: 42
   python_version: "3.14"
 
@@ -23,12 +23,15 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  class_weight_mode: sqrt_balanced
+  class_weight_power: 0.35
+  class_weight_clip: [0.85, 1.80]
   early_stopping_fraction: 0.15
   text_temperature: 1.20
   xgboost_temperature: 1.15
   lightgbm_temperature: 1.15
   text_linear_svc:
-    C: 0.10
+    C: 0.07
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
@@ -64,7 +67,7 @@ model:
     verbosity: -1
     early_stopping_rounds: 30
   meta_learner:
-    C: 0.03
+    C: 0.02
     solver: lbfgs
     class_weight: balanced
     max_iter: 3000
@@ -81,7 +84,7 @@ training:
   target_train_macro_f1_max: 0.70
 
 preprocessing:
-  name: pipeComb_em_v2
+  name: pipeComb_em_v3
   text_parameters:
     word_ngram_range: [1, 2]
     word_min_df: 3
@@ -113,9 +116,20 @@ preprocessing:
       F17: {top_genes_per_class: 20}
       F18: {top_genes_per_class: 20}
       F19: {top_genes_per_class: 20}
+  jyp9_parameters:
+    f7_pairs: [[KIRC, KIPAN], [LGG, GBMLGG]]
+    f7_top_k_per_direction: 2
+    f7_min_gene_support: 15
+    f7_laplace_alpha: 6.0
+    f7_burden_quantiles: 5
+    f7_stability_folds: 5
+    f7_min_direction_consistency: 5
+    f7_min_selection_frequency: 4
+    f7_oof_folds: 5
+    f7_random_state: 42
 
 experiment_design:
-  components: [EMV46, JSJ9]
+  components: [EMV46, JSJ9, JYP9]
   ensemble_model: [LinearSVC, XGBoost, LightGBM]
   ensemble_method: single_level_cross_fitted_regularized_stacking
   combined_input: model_specific_text_tree_bundle
@@ -123,6 +137,11 @@ experiment_design:
   jsj9_text_features_used: true
   jsj9_tree_features_used: false
   duplicate_jsj9_tree_removed: true
+  jyp9_features_used: [F7_pair_contrast, F9_global_aa_pair_log1p]
+  jyp9_fixed_feature_count: 384
+  jyp9_duplicate_blocks_removed: [F0, F1, F2, F3_position, F3_aa, F4]
+  jyp9_mutation_matrix_reused_from_emv46: true
+  jyp9_full_rescan_removed: true
   duplicate_emv46_count: 1
   outer_oof_enabled: false
   outer_evaluation_folds: 1
@@ -145,4 +164,22 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: strengthen_jyp9_f7_stable_pair_gene_selection
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v3
+  unchanged_model_hyperparameters: true
+  change_only: jyp9_f7_regularization
+  f7_parameter_changes:
+    top_k_per_direction: [3, 2]
+    min_gene_support: [10, 15]
+    laplace_alpha: [4.0, 6.0]
+    min_direction_consistency: [4, 5]
+    min_selection_frequency: [3, 4]
+  target_aware_feature_policy: fold_train_only_with_internal_oof
+  test_fit_used: false
+
+improvement_target:
+  objective: reduce_pair_feature_drift_while_preserving_overlapping_subclass_gain
+  primary_pairs: [[KIRC, KIPAN], [LGG, GBMLGG]]
+  overfit_control: stable_gene_selection_and_oof_pair_features

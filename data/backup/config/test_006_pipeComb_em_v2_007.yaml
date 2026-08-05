@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_007
+  description: "v2_002의 텍스트·meta 규제를 중간 수준으로 강화한 stacking"
   seed: 42
   python_version: "3.14"
 
@@ -28,7 +28,7 @@ model:
   xgboost_temperature: 1.15
   lightgbm_temperature: 1.15
   text_linear_svc:
-    C: 0.10
+    C: 0.07
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
@@ -64,7 +64,7 @@ model:
     verbosity: -1
     early_stopping_rounds: 30
   meta_learner:
-    C: 0.03
+    C: 0.02
     solver: lbfgs
     class_weight: balanced
     max_iter: 3000
@@ -84,12 +84,12 @@ preprocessing:
   name: pipeComb_em_v2
   text_parameters:
     word_ngram_range: [1, 2]
-    word_min_df: 3
-    word_max_features: 180000
+    word_min_df: 4
+    word_max_features: 160000
     char_ngram_range: [3, 5]
-    char_min_df: 4
-    char_max_features: 120000
-    char_weight: 0.4
+    char_min_df: 6
+    char_max_features: 100000
+    char_weight: 0.30
     split_multi_event: false
   emv46_parameters:
     min_mutation_count: 5
@@ -145,4 +145,13 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: moderate_text_and_meta_regularization
+
+experiment_variant:
+  source_experiment: test_006_pipeComb_em_v2_002
+  source_validation_macro_f1: 0.5461155311
+  source_train_macro_f1: 0.7725990103
+  source_overfit_gap: 0.2264834792
+  objective: reduce_text_memorization_without_aggressive_underfitting
+  changed_groups: [text_tfidf, LinearSVC, meta_learner]
+

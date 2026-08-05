@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_003
+  description: "텍스트 차원·희귀 n-gram·LinearSVC 규제를 강화한 OOF stacking"
   seed: 42
   python_version: "3.14"
 
@@ -28,7 +28,7 @@ model:
   xgboost_temperature: 1.15
   lightgbm_temperature: 1.15
   text_linear_svc:
-    C: 0.10
+    C: 0.05
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
@@ -84,12 +84,12 @@ preprocessing:
   name: pipeComb_em_v2
   text_parameters:
     word_ngram_range: [1, 2]
-    word_min_df: 3
-    word_max_features: 180000
+    word_min_df: 5
+    word_max_features: 140000
     char_ngram_range: [3, 5]
-    char_min_df: 4
-    char_max_features: 120000
-    char_weight: 0.4
+    char_min_df: 7
+    char_max_features: 80000
+    char_weight: 0.25
     split_multi_event: false
   emv46_parameters:
     min_mutation_count: 5
@@ -145,4 +145,12 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: stronger_text_regularization
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2
+  change_only: text_regularization
+  linear_svc_c: 0.05
+  rare_ngram_filter_strengthened: true
+  text_feature_caps_reduced: true
+

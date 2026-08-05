@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_pipeComb_em_v2
-  description: "EMV46 + JSJ9의 LinearSVC·XGBoost·LightGBM OOF stacking"
+  experiment_name: test_006_pipeComb_em_v2_010
+  description: "v2_008의 클래스 가중치·텍스트·meta 규제를 추가 안정화한 stacking"
   seed: 42
   python_version: "3.14"
 
@@ -23,12 +23,15 @@ data:
 model:
   name: pipecomb_oof_stacking
   stacking_folds: 5
+  class_weight_mode: sqrt_balanced
+  class_weight_power: 0.25
+  class_weight_clip: [0.90, 1.60]
   early_stopping_fraction: 0.15
-  text_temperature: 1.20
+  text_temperature: 1.35
   xgboost_temperature: 1.15
   lightgbm_temperature: 1.15
   text_linear_svc:
-    C: 0.10
+    C: 0.05
     class_weight: balanced
     max_iter: 20000
     tol: 0.0001
@@ -64,7 +67,7 @@ model:
     verbosity: -1
     early_stopping_rounds: 30
   meta_learner:
-    C: 0.03
+    C: 0.015
     solver: lbfgs
     class_weight: balanced
     max_iter: 3000
@@ -84,12 +87,12 @@ preprocessing:
   name: pipeComb_em_v2
   text_parameters:
     word_ngram_range: [1, 2]
-    word_min_df: 3
-    word_max_features: 180000
+    word_min_df: 4
+    word_max_features: 160000
     char_ngram_range: [3, 5]
-    char_min_df: 4
-    char_max_features: 120000
-    char_weight: 0.4
+    char_min_df: 6
+    char_max_features: 100000
+    char_weight: 0.30
     split_multi_event: false
   emv46_parameters:
     min_mutation_count: 5
@@ -145,4 +148,32 @@ record:
   training_performed: false
   evaluation_performed: false
   external_data_used: false
-  intended_change: non_nested_single_level_oof_stacking
+  intended_change: further_stabilize_class_weights_text_and_meta_regularization
+
+experiment_variant:
+  baseline: test_006_pipeComb_em_v2_008
+  change_only: class_weight_relaxation
+  weight_source: current_inner_fold_train_labels_only
+  formula: (n_samples / (n_classes * class_count)) ** 0.25
+  clipping: [0.90, 1.60]
+  applied_to: [LinearSVC, meta_learner]
+
+improvement_target:
+  source_validation_macro_f1: 0.5618782610
+  source_train_macro_f1: 0.8137594147
+  source_overfit_gap: 0.2518811537
+  observed_text_meta_coefficient_energy_ratio: 0.68
+  observed_xgboost_selected_estimators: 350
+  observed_lightgbm_selected_estimators: 280
+  objective: preserve_v008_macro_f1_while_reducing_text_dominance_and_train_gap
+
+regularization_changes:
+  class_weight_power: [0.35, 0.25]
+  class_weight_clip_max: [1.80, 1.60]
+  linear_svc_c: [0.07, 0.05]
+  meta_learner_c: [0.02, 0.015]
+  text_temperature: [1.20, 1.35]
+  word_min_df: [3, 4]
+  char_min_df: [4, 6]
+  char_weight: [0.40, 0.30]
+
