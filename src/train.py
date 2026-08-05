@@ -176,6 +176,7 @@ def split_preprocessing_config(config: dict) -> tuple[dict, dict]:
     tuning_keys = (
         "min_mutation_count_cv",
         "min_functional_mutation_count_cv",
+        "min_redundancy_support_cv",
     )
     pipeline_config = {
         key: value
@@ -203,6 +204,11 @@ def select_min_mutation_count(
         "em_v3": "min_mutation_count",
         "em_v19": "min_functional_mutation_count",
         "em_v20": "min_functional_mutation_count",
+        "em_G01": "min_active_count",
+        "em_G02": "min_active_count",
+        "em_G03": "min_active_count",
+        "em_G04": "min_active_count",
+        "em_G05": "min_active_count",
     }
     parameter_name = parameter_by_pipeline.get(pipeline_name)
     if parameter_name is None or not tuning_config.get("enabled", False):

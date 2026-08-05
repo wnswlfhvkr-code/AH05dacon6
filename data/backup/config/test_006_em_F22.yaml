@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_em_F20
-  description: "EMV45 + F01~F19 전체 고유 파생 피처"
+  experiment_name: test_006_em_F22
+  description: "EMV45 + F20"
   seed: 42
   python_version: "3.12"
 
@@ -30,7 +30,7 @@ model:
   subsample: 0.75
   colsample_bytree: 0.50
   reg_alpha: 1.5
-  reg_lambda: 15.0
+  reg_lambda: 17.0
   early_stopping_rounds: 30
   eval_metric: mlogloss
   tree_method: hist

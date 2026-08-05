@@ -1,4 +1,4 @@
-"""EMV45와 F20의 고유 피처를 중복 없이 결합한 독립 EMV46."""
+"""EMV45와 F22 실험(F20)의 고유 피처를 중복 없이 결합한 독립 EMV46."""
 
 from __future__ import annotations
 
@@ -51,7 +51,11 @@ V46_DERIVED_PIPELINE_CLASSES = {
 
 
 class EMV46PreprocessingPipeline(PreprocessingPipeline):
-    """EMV45를 한 번 유지하고 F20의 F01~F19 고유 피처를 추가합니다."""
+    """EMV45를 한 번 유지하고 F22가 사용한 F20 고유 피처를 추가합니다.
+
+    ``test_006_em_F22``는 별도 F22 파이프라인이 아니라 EMF20을 사용하므로,
+    EMF20 전체를 결합하지 않고 그 안의 F01~F19 파생 부분만 한 번 추가합니다.
+    """
 
     name = "em_v46"
     evaluation_folds = 5
@@ -81,6 +85,7 @@ class EMV46PreprocessingPipeline(PreprocessingPipeline):
         }
         self.steps = (
             "EMV45 베이스 피처 1회 생성",
+            "F22 실험의 실제 전처리 EMF20에서 중복 EMV45 제외",
             "F01~F15 비레이블 파생 피처",
             "F16~F19 inner-fold OOF signature 피처",
             "F번호 접두사로 컬럼 충돌 제거",
@@ -164,4 +169,3 @@ class EMV46PreprocessingPipeline(PreprocessingPipeline):
             ),
         })
         return result
-
