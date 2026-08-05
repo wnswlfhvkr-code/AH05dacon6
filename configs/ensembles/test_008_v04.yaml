@@ -1,5 +1,6 @@
+# E10A: E10 + TEST_004_7(jsj) ensemble
 project:
-  experiment_name: test_006_v04
+  experiment_name: test_008_v04
 
 data:
   raw_dir: data/raw
@@ -9,14 +10,14 @@ data:
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e10_dir: data/processed/test_006_v03
+  e10_dir: data/processed/test_002_v10
   em16_dir: data/processed/test_006_v02_em16
   em24_dir: data/processed/test_006_v04_em24
   em16_oof_file: em16_sgkf_oof_probability_by_seed.npy
   em16_test_file: em16_sgkf_test_probability_by_seed_fold.npy
   em24_oof_file: em24_sgkf_oof_probability_by_seed.npy
   em24_test_file: em24_sgkf_test_probability_by_seed_fold.npy
-  output_dir: data/processed/test_006_v04
+  output_dir: data/processed/test_008_v04
 
 validation:
   n_splits: 3

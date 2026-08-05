@@ -1,4 +1,4 @@
-# test_006 — E7·E8 cross-fit 보정 앙상블
+# test_008 — E7·E8 cross-fit 보정 앙상블
 
 ## 실험 목적
 
@@ -65,7 +65,7 @@ E8A는 세 seed에서 E8보다 높은 OOF 성능을 기록했고, paired bootstr
 
 ```bash
 python -m src.ensembles.train_jh_e8a \
-  --config configs/test_006.yaml
+  --config configs/test_008.yaml
 ```
 
 E7 확률 배열과 E8 decision score 배열은 `data/processed` 하위에 필요하며, 해당 결과 파일은 `.gitignore` 대상이다.
@@ -73,7 +73,7 @@ E7 확률 배열과 E8 decision score 배열은 `data/processed` 하위에 필�
 ## 저장소 구조
 
 - 실행기: `src/ensembles/train_jh_e8a.py`
-- 설정: `configs/test_006.yaml`
-- 보고서: `experiments/ensembles/test_006.md`
+- 설정: `configs/test_008.yaml`
+- 보고서: `experiments/ensembles/test_008.md`
 
 E8A는 독립 전처리 파이프라인이 아니라 E7과 E8의 저장된 OOF·Test 출력을 결합하는 실험이므로 `src/pipelines` 대신 `src/ensembles` 하위에서 관리한다.

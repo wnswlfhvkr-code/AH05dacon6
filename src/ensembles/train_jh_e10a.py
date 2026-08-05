@@ -172,7 +172,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config", type=Path,
-        default=Path("configs/ensembles/test_006_v04.yaml"),
+        default=Path("configs/ensembles/test_008_v04.yaml"),
     )
     args = parser.parse_args()
     config = load_config(args.config)
