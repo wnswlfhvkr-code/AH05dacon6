@@ -642,7 +642,7 @@ def main() -> None:
         "--config",
         type=Path,
         default=Path(
-            "configs/test_006.yaml"
+            "configs/ensembles/test_008_v06.yaml"
         ),
     )
 

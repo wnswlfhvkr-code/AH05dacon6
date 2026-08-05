@@ -1,6 +1,7 @@
-# E10B-1: E10 + TF-IDF only
 project:
   experiment_name: test_008_v05
+  description: "E10B-1: E10 + TF-IDF only"
+  python_version: "3.12"
 
 data:
   raw_dir: data/raw

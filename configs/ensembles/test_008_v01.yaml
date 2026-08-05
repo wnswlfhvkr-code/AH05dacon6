@@ -1,5 +1,7 @@
 project:
   experiment_name: test_008_v01
+  description: "E8A+em_v16 ensemble(1)"
+  python_version: "3.12"
 
 data:
   raw_dir: data/raw
@@ -9,8 +11,8 @@ data:
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e7_dir: data/processed/test_002_v07
-  e8_dir: data/processed/test_002_v08
+  e7_dir: data/processed/test_002_v08
+  e8_dir: data/processed/test_002_v09
   e8a_dir: data/processed/test_002_e8a
   em16_dir: data/processed/test_006_v01_em16
   em16_oof_files:
