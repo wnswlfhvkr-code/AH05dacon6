@@ -1,7 +1,7 @@
 project:
   name: AH05dacon6
-  experiment_name: test_006_em_v46
-  description: "EMV45 + F22 실험(F20) 고유 피처의 중복 제거 결합"
+  experiment_name: test_006_em_F21
+  description: "EMV45 + F20"
   seed: 42
   python_version: "3.12"
 
@@ -30,7 +30,7 @@ model:
   subsample: 0.75
   colsample_bytree: 0.50
   reg_alpha: 1.5
-  reg_lambda: 17.0
+  reg_lambda: 16.5
   early_stopping_rounds: 30
   eval_metric: mlogloss
   tree_method: hist
@@ -43,7 +43,7 @@ training:
   overfit_threshold: 0.1
 
 preprocessing:
-  name: em_v46
+  name: em_F20
   min_mutation_count: 5
   min_functional_mutation_count: 5
   min_feature_support: 2
@@ -77,10 +77,6 @@ preprocessing:
 
 experiment_design:
   base_pipeline: em_v45
-  source_experiment: test_006_em_F22
-  combined_pipeline: em_F20
-  f22_is_experiment_name_not_pipeline: true
-  duplicate_emv45_removed: true
   included_features: [F01, F02, F03, F04, F05, F06, F07, F08, F09, F10, F11, F12, F13, F14, F15, F16, F17, F18, F19]
   duplicate_v45_base_count: 1
   label_based_features_oof: [F16, F17, F18, F19]
