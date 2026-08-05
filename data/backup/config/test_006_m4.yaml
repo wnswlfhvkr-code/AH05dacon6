@@ -1,0 +1,42 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_006_m4
+  seed: 42
+  python_version: "3.12"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: logistic_regression
+  C: 0.2
+  class_weight: balanced
+  solver: saga
+  # scikit-learn 1.8+: 0.0=L2, 1.0=L1
+  l1_ratio: 0.0
+  max_iter: 5000
+  tol: 0.0001
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  overfit_threshold: 0.1
+
+preprocessing:
+  name: em_v16
+  min_mutation_count: 5
+  top_genes_per_class: 20
+  smoothing: 0.5
+  max_log2_odds: 8.0
+  shrinkage: 10.0
+  min_hotspot_count: 5
+  max_hotspots: 384
+  inner_signature_folds: 5
+  signature_random_state: 42
