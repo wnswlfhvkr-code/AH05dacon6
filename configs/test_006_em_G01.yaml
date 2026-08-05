@@ -43,14 +43,14 @@ preprocessing:
 model:
   name: xgboost
   objective: multi:softprob
-  n_estimators: 450
-  learning_rate: 0.025
+  n_estimators: 500
+  learning_rate: 0.03
   max_depth: 3
-  min_child_weight: 10.0
-  subsample: 0.70
-  colsample_bytree: 0.45
-  reg_alpha: 2.0
-  reg_lambda: 20.0
+  min_child_weight: 7.0
+  subsample: 0.75
+  colsample_bytree: 0.50
+  reg_alpha: 1.5
+  reg_lambda: 17.0
   early_stopping_rounds: 30
   eval_metric: mlogloss
   tree_method: hist
@@ -78,6 +78,11 @@ experiment_design:
     - low_raw_missing_rate
   support_candidates: [1, 2, 3, 5, 10, 20]
   support_selection_metric: mean_macro_f1_then_lower_fold_std
+  early_stopping_enabled: true
+  early_stopping_rounds: 30
+  early_stopping_metric: mlogloss
+  early_stopping_eval_source: validation_fold
+  final_refit_tree_count: median_oof_best_iteration
   fit_statistics_within_fold: true
   preserve_original_subclass: true
   external_data_used: false

@@ -1,8 +1,9 @@
-"""JSJ9·EMV45 교차 적합 확률을 사용하는 규제형 stacking 모델."""
+"""JSJ9 text와 EM 계열 tree의 교차 적합 확률을 결합하는 앙상블 모델."""
 
 from __future__ import annotations
 
 import numpy as np
+from scipy.optimize import minimize
 from scipy.special import softmax
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, train_test_split
@@ -13,7 +14,7 @@ from src.pipelines.em_preprocessing.pipeline_pipeComb_em_v1_006 import OOFStacki
 
 
 class PipeCombOOFStackingClassifier:
-    """TF-IDF SVC와 EMV45 트리 모델을 OOF meta learner로 결합합니다."""
+    """TF-IDF SVC와 EM tree 모델을 OOF stacking 또는 log blend로 결합합니다."""
 
     def __init__(self, model_config: dict, seed: int) -> None:
         self.seed = int(seed)
@@ -22,6 +23,37 @@ class PipeCombOOFStackingClassifier:
             raise ValueError("stacking_folds는 2 이상이어야 합니다.")
 
         self.text_config = dict(model_config.get("text_linear_svc", {}))
+        self.ensemble_method = str(
+            model_config.get("ensemble_method", "regularized_stacking")
+        )
+        if self.ensemble_method not in {
+            "regularized_stacking",
+            "constrained_log_blend",
+        }:
+            raise ValueError(f"지원하지 않는 앙상블 방식입니다: {self.ensemble_method}")
+        self.third_model_name = str(
+            model_config.get("third_model", "lightgbm")
+        ).lower()
+        if self.third_model_name not in {"lightgbm", "catboost"}:
+            raise ValueError(f"지원하지 않는 세 번째 모델입니다: {self.third_model_name}")
+        self.class_weight_mode = str(
+            model_config.get("class_weight_mode", "configured")
+        ).lower()
+        if self.class_weight_mode not in {"configured", "none", "sqrt_balanced"}:
+            raise ValueError(
+                f"지원하지 않는 클래스 가중치 방식입니다: {self.class_weight_mode}"
+            )
+        class_weight_clip = model_config.get("class_weight_clip", (0.75, 2.5))
+        self.class_weight_clip = tuple(float(value) for value in class_weight_clip)
+        self.class_weight_power = float(model_config.get("class_weight_power", 0.5))
+        if (
+            len(self.class_weight_clip) != 2
+            or self.class_weight_clip[0] <= 0
+            or self.class_weight_clip[0] > self.class_weight_clip[1]
+        ):
+            raise ValueError("class_weight_clip은 양수인 [최솟값, 최댓값]이어야 합니다.")
+        if not 0.0 <= self.class_weight_power <= 1.0:
+            raise ValueError("class_weight_power는 0 이상 1 이하여야 합니다.")
         self.xgb_config = dict(
             model_config.get(
                 "emv46_xgboost",
@@ -34,11 +66,15 @@ class PipeCombOOFStackingClassifier:
                 model_config.get("emv45_lightgbm", {}),
             )
         )
+        self.catboost_config = dict(model_config.get("emv46_catboost", {}))
         self.xgb_early_stopping_rounds = int(
             self.xgb_config.pop("early_stopping_rounds", 0) or 0
         )
         self.lgbm_early_stopping_rounds = int(
             self.lgbm_config.pop("early_stopping_rounds", 0) or 0
+        )
+        self.catboost_early_stopping_rounds = int(
+            self.catboost_config.pop("early_stopping_rounds", 0) or 0
         )
         self.early_stopping_fraction = float(
             model_config.get("early_stopping_fraction", 0.15)
@@ -46,9 +82,16 @@ class PipeCombOOFStackingClassifier:
         if not 0.0 < self.early_stopping_fraction < 0.5:
             raise ValueError("early_stopping_fraction은 0보다 크고 0.5보다 작아야 합니다.")
         self.meta_config = dict(model_config.get("meta_learner", {}))
+        self.blend_config = dict(model_config.get("constrained_log_blend", {}))
         self.text_temperature = float(model_config.get("text_temperature", 1.20))
         self.xgb_temperature = float(model_config.get("xgboost_temperature", 1.15))
-        self.lgbm_temperature = float(model_config.get("lightgbm_temperature", 1.15))
+        default_third_temperature = model_config.get(
+            "catboost_temperature",
+            model_config.get("lightgbm_temperature", 1.15),
+        )
+        self.lgbm_temperature = float(
+            model_config.get("third_temperature", default_third_temperature)
+        )
         if min(self.text_temperature, self.xgb_temperature, self.lgbm_temperature) <= 0:
             raise ValueError("확률 temperature는 0보다 커야 합니다.")
 
@@ -62,6 +105,8 @@ class PipeCombOOFStackingClassifier:
         self.meta_feature_count_ = 0
         self.selected_xgb_estimators_ = 0
         self.selected_lgbm_estimators_ = 0
+        self.calibrated_temperatures_ = np.ones(3, dtype="float64")
+        self.blend_weights_ = np.full(3, 1.0 / 3.0, dtype="float64")
 
     @staticmethod
     def _require_bundle(features) -> OOFStackingFeatureBundle:
@@ -72,10 +117,35 @@ class PipeCombOOFStackingClassifier:
             )
         return features
 
-    def _create_text_model(self, seed_offset: int = 0) -> LinearSVC:
+    def _class_weights(self, labels: np.ndarray | None):
+        if self.class_weight_mode == "configured":
+            return None
+        if self.class_weight_mode == "none":
+            return None
+        if labels is None:
+            raise ValueError("sqrt_balanced 클래스 가중치에는 학습 labels가 필요합니다.")
+        classes, counts = np.unique(labels, return_counts=True)
+        raw = (
+            len(labels) / (len(classes) * counts.astype("float64"))
+        ) ** self.class_weight_power
+        clipped = np.clip(raw, *self.class_weight_clip)
+        return {
+            value.item() if hasattr(value, "item") else value: float(weight)
+            for value, weight in zip(classes, clipped)
+        }
+
+    def _create_text_model(
+        self,
+        seed_offset: int = 0,
+        labels: np.ndarray | None = None,
+    ) -> LinearSVC:
         parameters = dict(self.text_config)
         parameters.setdefault("C", 0.10)
         parameters.setdefault("class_weight", "balanced")
+        if self.class_weight_mode == "none":
+            parameters["class_weight"] = None
+        elif self.class_weight_mode == "sqrt_balanced":
+            parameters["class_weight"] = self._class_weights(labels)
         parameters.setdefault("max_iter", 20000)
         parameters.setdefault("tol", 1e-4)
         parameters.setdefault("dual", "auto")
@@ -140,8 +210,99 @@ class PipeCombOOFStackingClassifier:
         parameters["random_state"] = self.seed + seed_offset
         return LGBMClassifier(**parameters)
 
+    def _create_catboost(
+        self,
+        seed_offset: int = 0,
+        n_estimators: int | None = None,
+    ):
+        try:
+            from catboost import CatBoostClassifier
+        except ImportError as error:
+            raise ImportError("CatBoost 교체 실험에는 catboost가 필요합니다.") from error
+        parameters = dict(self.catboost_config)
+        parameters.setdefault("loss_function", "MultiClass")
+        parameters.setdefault("eval_metric", "MultiClass")
+        parameters.setdefault("iterations", 350)
+        parameters.setdefault("learning_rate", 0.025)
+        parameters.setdefault("depth", 4)
+        parameters.setdefault("l2_leaf_reg", 18.0)
+        parameters.setdefault("random_strength", 1.0)
+        parameters.setdefault("bootstrap_type", "Bernoulli")
+        parameters.setdefault("subsample", 0.75)
+        parameters.setdefault("rsm", 0.50)
+        parameters.setdefault("thread_count", -1)
+        parameters.setdefault("verbose", False)
+        parameters.setdefault("allow_writing_files", False)
+        if n_estimators is not None:
+            parameters["iterations"] = int(n_estimators)
+        parameters["random_seed"] = self.seed + seed_offset
+        return CatBoostClassifier(**parameters)
+
+    def _create_third_model(
+        self,
+        seed_offset: int = 0,
+        n_estimators: int | None = None,
+    ):
+        if self.third_model_name == "catboost":
+            return self._create_catboost(seed_offset, n_estimators)
+        return self._create_lightgbm(seed_offset, n_estimators)
+
+    def _third_early_stopping_rounds(self) -> int:
+        if self.third_model_name == "catboost":
+            return self.catboost_early_stopping_rounds
+        return self.lgbm_early_stopping_rounds
+
+    def _third_fallback_estimators(self) -> int:
+        if self.third_model_name == "catboost":
+            return int(self.catboost_config.get("iterations", 350))
+        return int(self.lgbm_config.get("n_estimators", 280))
+
+    def _fit_third_model(
+        self,
+        model,
+        tree,
+        labels: np.ndarray,
+        fit_index: np.ndarray,
+        stop_index: np.ndarray,
+    ) -> None:
+        rounds = self._third_early_stopping_rounds()
+        if rounds <= 0:
+            model.fit(tree[fit_index], labels[fit_index])
+            return
+        if self.third_model_name == "catboost":
+            model.fit(
+                tree[fit_index],
+                labels[fit_index],
+                eval_set=(tree[stop_index], labels[stop_index]),
+                early_stopping_rounds=rounds,
+                use_best_model=True,
+                verbose=False,
+            )
+            return
+        from lightgbm import early_stopping, log_evaluation
+
+        model.fit(
+            tree[fit_index],
+            labels[fit_index],
+            eval_X=tree[stop_index],
+            eval_y=labels[stop_index],
+            eval_metric="multi_logloss",
+            callbacks=[
+                early_stopping(rounds, verbose=False),
+                log_evaluation(period=0),
+            ],
+        )
+
     @staticmethod
     def _best_iteration_count(model, fallback: int) -> int:
+        get_best_iteration = getattr(model, "get_best_iteration", None)
+        if callable(get_best_iteration):
+            try:
+                value = int(get_best_iteration())
+            except (TypeError, ValueError):
+                value = -1
+            if value >= 0:
+                return value + 1
         for attribute in ("best_iteration", "best_iteration_"):
             try:
                 value = int(getattr(model, attribute))
@@ -205,14 +366,111 @@ class PipeCombOOFStackingClassifier:
             (self._meta_block(text), self._meta_block(xgb), self._meta_block(lgbm))
         ).astype("float64", copy=False)
 
-    def _create_meta_model(self) -> LogisticRegression:
+    def _create_meta_model(
+        self,
+        labels: np.ndarray | None = None,
+    ) -> LogisticRegression:
         parameters = dict(self.meta_config)
         parameters.setdefault("C", 0.05)
         parameters.setdefault("solver", "lbfgs")
         parameters.setdefault("class_weight", "balanced")
+        if self.class_weight_mode == "none":
+            parameters["class_weight"] = None
+        elif self.class_weight_mode == "sqrt_balanced":
+            parameters["class_weight"] = self._class_weights(labels)
         parameters.setdefault("max_iter", 3000)
         parameters["random_state"] = self.seed
         return LogisticRegression(**parameters)
+
+    def _fit_temperature(
+        self,
+        probabilities: np.ndarray,
+        labels: np.ndarray,
+    ) -> float:
+        candidates = np.asarray(
+            self.blend_config.get(
+                "temperature_candidates",
+                (0.8, 1.0, 1.2, 1.4, 1.6, 2.0),
+            ),
+            dtype="float64",
+        )
+        if candidates.ndim != 1 or len(candidates) == 0 or np.any(candidates <= 0):
+            raise ValueError("temperature_candidates는 양수 목록이어야 합니다.")
+        class_positions = {value: index for index, value in enumerate(self.classes_)}
+        target = np.asarray([class_positions[value] for value in labels], dtype="int64")
+        losses = []
+        for temperature in candidates:
+            calibrated = self._temperature_scale(probabilities, float(temperature))
+            losses.append(
+                -np.log(np.clip(calibrated[np.arange(len(target)), target], 1e-12, 1.0)).mean()
+            )
+        return float(candidates[int(np.argmin(losses))])
+
+    @staticmethod
+    def _log_probability_blend(
+        probabilities: tuple[np.ndarray, np.ndarray, np.ndarray],
+        weights: np.ndarray,
+    ) -> np.ndarray:
+        logits = sum(
+            float(weight) * np.log(np.clip(values, 1e-12, 1.0))
+            for weight, values in zip(weights, probabilities)
+        )
+        return softmax(logits, axis=1)
+
+    def _fit_constrained_blend(
+        self,
+        text_oof: np.ndarray,
+        xgb_oof: np.ndarray,
+        third_oof: np.ndarray,
+        labels: np.ndarray,
+    ) -> None:
+        raw = (text_oof, xgb_oof, third_oof)
+        self.calibrated_temperatures_ = np.asarray(
+            [self._fit_temperature(values, labels) for values in raw],
+            dtype="float64",
+        )
+        calibrated = tuple(
+            self._temperature_scale(values, temperature)
+            for values, temperature in zip(raw, self.calibrated_temperatures_)
+        )
+        names = ("text", "xgboost", "third")
+        default_bounds = ((0.30, 0.70), (0.10, 0.45), (0.10, 0.45))
+        configured_bounds = self.blend_config.get("weight_bounds", {})
+        bounds = tuple(
+            tuple(float(value) for value in configured_bounds.get(name, default))
+            for name, default in zip(names, default_bounds)
+        )
+        if any(len(bound) != 2 or bound[0] < 0 or bound[0] > bound[1] for bound in bounds):
+            raise ValueError("각 blend weight_bounds는 [최솟값, 최댓값]이어야 합니다.")
+        initial = np.asarray(
+            self.blend_config.get("initial_weights", (0.50, 0.25, 0.25)),
+            dtype="float64",
+        )
+        if initial.shape != (3,) or np.any(initial < 0) or initial.sum() <= 0:
+            raise ValueError("initial_weights는 음수가 아닌 3개 값이어야 합니다.")
+        initial /= initial.sum()
+        class_positions = {value: index for index, value in enumerate(self.classes_)}
+        target = np.asarray([class_positions[value] for value in labels], dtype="int64")
+        shrinkage = float(self.blend_config.get("weight_l2", 0.01))
+
+        def objective(weights: np.ndarray) -> float:
+            blended = self._log_probability_blend(calibrated, weights)
+            loss = -np.log(
+                np.clip(blended[np.arange(len(target)), target], 1e-12, 1.0)
+            ).mean()
+            return float(loss + shrinkage * np.square(weights - initial).sum())
+
+        result = minimize(
+            objective,
+            initial,
+            method="SLSQP",
+            bounds=bounds,
+            constraints={"type": "eq", "fun": lambda weights: weights.sum() - 1.0},
+            options={"maxiter": int(self.blend_config.get("max_iter", 300))},
+        )
+        if not result.success:
+            raise RuntimeError(f"제약형 blend 가중치 최적화 실패: {result.message}")
+        self.blend_weights_ = np.asarray(result.x, dtype="float64")
 
     def fit(self, features, labels):
         bundle = self._require_bundle(features)
@@ -233,10 +491,10 @@ class PipeCombOOFStackingClassifier:
 
         for fold, (train_index, valid_index) in enumerate(splitter.split(np.zeros(rows), y)):
             offset = 100 * (fold + 1)
-            text_model = self._create_text_model(offset)
+            text_model = self._create_text_model(offset, y[train_index])
             early_stop_enabled = (
                 self.xgb_early_stopping_rounds > 0
-                or self.lgbm_early_stopping_rounds > 0
+                or self._third_early_stopping_rounds() > 0
             )
             if early_stop_enabled:
                 fit_index, stop_index = self._early_stopping_indices(
@@ -248,7 +506,7 @@ class PipeCombOOFStackingClassifier:
                 offset + 1,
                 enable_early_stopping=self.xgb_early_stopping_rounds > 0,
             )
-            lgbm_model = self._create_lightgbm(offset + 2)
+            lgbm_model = self._create_third_model(offset + 2)
             text_model.fit(bundle.text[train_index], y[train_index])
             if self.xgb_early_stopping_rounds > 0:
                 xgb_model.fit(
@@ -259,25 +517,13 @@ class PipeCombOOFStackingClassifier:
                 )
             else:
                 xgb_model.fit(bundle.tree[train_index], y[train_index])
-            if self.lgbm_early_stopping_rounds > 0:
-                from lightgbm import early_stopping, log_evaluation
-
-                lgbm_model.fit(
-                    bundle.tree[fit_index],
-                    y[fit_index],
-                    eval_X=bundle.tree[stop_index],
-                    eval_y=y[stop_index],
-                    eval_metric="multi_logloss",
-                    callbacks=[
-                        early_stopping(
-                            self.lgbm_early_stopping_rounds,
-                            verbose=False,
-                        ),
-                        log_evaluation(period=0),
-                    ],
-                )
-            else:
-                lgbm_model.fit(bundle.tree[train_index], y[train_index])
+            self._fit_third_model(
+                lgbm_model,
+                bundle.tree,
+                y,
+                fit_index if self._third_early_stopping_rounds() > 0 else train_index,
+                stop_index,
+            )
             xgb_best_counts.append(
                 self._best_iteration_count(
                     xgb_model, self.xgb_config.get("n_estimators", 350)
@@ -285,7 +531,7 @@ class PipeCombOOFStackingClassifier:
             )
             lgbm_best_counts.append(
                 self._best_iteration_count(
-                    lgbm_model, self.lgbm_config.get("n_estimators", 280)
+                    lgbm_model, self._third_fallback_estimators()
                 )
             )
 
@@ -308,20 +554,25 @@ class PipeCombOOFStackingClassifier:
                 self.lgbm_temperature,
             )
 
-        meta_features = self._meta_features(text_oof, xgb_oof, lgbm_oof)
-        self.meta_feature_count_ = int(meta_features.shape[1])
         self.inner_oof_rows_ = rows
-        scaled_meta = self.meta_scaler.fit_transform(meta_features)
-        self.meta_model = self._create_meta_model()
-        self.meta_model.fit(scaled_meta, y)
+        if self.ensemble_method == "constrained_log_blend":
+            self._fit_constrained_blend(text_oof, xgb_oof, lgbm_oof, y)
+            self.meta_feature_count_ = 0
+            self.meta_model = None
+        else:
+            meta_features = self._meta_features(text_oof, xgb_oof, lgbm_oof)
+            self.meta_feature_count_ = int(meta_features.shape[1])
+            scaled_meta = self.meta_scaler.fit_transform(meta_features)
+            self.meta_model = self._create_meta_model(y)
+            self.meta_model.fit(scaled_meta, y)
 
         self.selected_xgb_estimators_ = int(np.median(xgb_best_counts))
         self.selected_lgbm_estimators_ = int(np.median(lgbm_best_counts))
-        self.text_model = self._create_text_model()
+        self.text_model = self._create_text_model(labels=y)
         self.xgb_model = self._create_xgboost(
             1, n_estimators=self.selected_xgb_estimators_
         )
-        self.lgbm_model = self._create_lightgbm(
+        self.lgbm_model = self._create_third_model(
             2, n_estimators=self.selected_lgbm_estimators_
         )
         self.text_model.fit(bundle.text, y)
@@ -355,10 +606,17 @@ class PipeCombOOFStackingClassifier:
         return text, xgb, lgbm
 
     def predict_proba(self, features) -> np.ndarray:
-        if self.meta_model is None:
+        if self.ensemble_method == "regularized_stacking" and self.meta_model is None:
             raise RuntimeError("예측 전에 모델을 fit해야 합니다.")
         bundle = self._require_bundle(features)
-        meta = self._meta_features(*self._base_probabilities(bundle))
+        base = self._base_probabilities(bundle)
+        if self.ensemble_method == "constrained_log_blend":
+            calibrated = tuple(
+                self._temperature_scale(values, temperature)
+                for values, temperature in zip(base, self.calibrated_temperatures_)
+            )
+            return self._log_probability_blend(calibrated, self.blend_weights_)
+        meta = self._meta_features(*base)
         probabilities = self.meta_model.predict_proba(self.meta_scaler.transform(meta))
         return self._align_probabilities(
             probabilities, self.meta_model.classes_, self.classes_
@@ -371,15 +629,26 @@ class PipeCombOOFStackingClassifier:
 
     def summary(self) -> dict[str, object]:
         return {
-            "ensemble_method": "cross_fitted_regularized_stacking",
+            "ensemble_method": self.ensemble_method,
             "base_learners": 3,
+            "third_model": self.third_model_name,
+            "class_weight_mode": self.class_weight_mode,
+            "class_weight_power": self.class_weight_power,
             "stacking_folds": self.stacking_folds,
             "meta_features": self.meta_feature_count_,
             "inner_oof_rows": self.inner_oof_rows_,
             "xgboost_early_stopping_rounds": self.xgb_early_stopping_rounds,
             "lightgbm_early_stopping_rounds": self.lgbm_early_stopping_rounds,
+            "catboost_early_stopping_rounds": self.catboost_early_stopping_rounds,
             "selected_xgboost_estimators": self.selected_xgb_estimators_,
-            "selected_lightgbm_estimators": self.selected_lgbm_estimators_,
+            "selected_third_model_estimators": self.selected_lgbm_estimators_,
+            "selected_lightgbm_estimators": (
+                self.selected_lgbm_estimators_
+                if self.third_model_name == "lightgbm"
+                else 0
+            ),
+            "calibrated_temperatures": self.calibrated_temperatures_.tolist(),
+            "blend_weights": self.blend_weights_.tolist(),
         }
 
 

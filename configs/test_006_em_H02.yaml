@@ -5,7 +5,23 @@ preprocessing:
   name: em_H02
   min_mutation_count: 5
   k_features: 1500
-model: {name: xgboost, objective: 'multi:softprob', n_estimators: 450, learning_rate: 0.025, max_depth: 3, min_child_weight: 10.0, subsample: 0.70, colsample_bytree: 0.45, reg_alpha: 2.0, reg_lambda: 20.0, early_stopping_rounds: 30, eval_metric: mlogloss, tree_method: hist, n_jobs: -1}
+
+model:
+  name: xgboost
+  objective: multi:softprob
+  n_estimators: 500
+  learning_rate: 0.03
+  max_depth: 3
+  min_child_weight: 7.0
+  subsample: 0.75
+  colsample_bytree: 0.50
+  reg_alpha: 1.5
+  reg_lambda: 17.0
+  early_stopping_rounds: 30
+  eval_metric: mlogloss
+  tree_method: hist
+  n_jobs: -1
+
 training: {validation_fraction: 0.2, stratify: true, metric: macro_f1, overfit_threshold: 0.1}
 experiment_design:
   base_pipeline: em_v46
