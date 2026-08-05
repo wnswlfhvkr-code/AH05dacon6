@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from src.models.pipecomb_ensemble_model import PipeCombEnsembleClassifier
-from src.pipelines.pipeline_pipeComb_em_v1_001 import (
+from src.pipelines.em_preprocessing.pipeline_pipeComb_em_v1_001 import (
     WeightedSoftVotingFeatureBundle,
 )
 

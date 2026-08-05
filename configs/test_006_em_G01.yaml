@@ -1,5 +1,15 @@
-project: {name: AH05dacon6, experiment_name: test_006_em_G01, seed: 42}
-execution: {status: design_only, train: false, evaluate: false, implementation_status: ready}
+project:
+  name: AH05dacon6
+  experiment_name: test_006_em_G01
+  description: "EMV46 저빈도·완전 중복·고상관 통합 선택"
+  seed: 42
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
 data:
   raw_dir: data/raw
   processed_dir: data/processed
@@ -8,6 +18,28 @@ data:
   submission_file: sample_submission.csv
   target_column: SUBCLASS
   id_column: ID
+
+preprocessing:
+  name: em_G01
+  min_active_count: 5
+  correlation_threshold: 0.90
+  correlation_max_features: 3000
+  correlation_block_size: 256
+  stability_folds: 5
+  stability_top_fraction: 0.20
+  active_epsilon: 1.0e-8
+  random_state: 42
+  min_mutation_count: 5
+  min_functional_mutation_count: 5
+  min_hotspot_count: 5
+  max_hotspots: 384
+  top_genes_per_class: 20
+  inner_signature_folds: 5
+  min_redundancy_support_cv:
+    enabled: true
+    candidates: [1, 2, 3, 5, 10, 20]
+    folds: 3
+
 model:
   name: xgboost
   objective: multi:softprob
@@ -23,30 +55,38 @@ model:
   eval_metric: mlogloss
   tree_method: hist
   n_jobs: -1
+
 training:
   validation_fraction: 0.2
   stratify: true
   metric: macro_f1
   overfit_threshold: 0.1
-preprocessing:
-  name: em_G01
-  min_active_count: 5
-  correlation_threshold: 0.90
-  correlation_max_features: 3000
-  correlation_block_size: 256
-  stability_folds: 5
-  stability_top_fraction: 0.20
-  random_state: 42
-  min_mutation_count: 5
-  min_functional_mutation_count: 5
-  min_hotspot_count: 5
-  max_hotspots: 384
-  top_genes_per_class: 20
-  inner_signature_folds: 5
-  min_redundancy_support_cv:
-    enabled: true
-    candidates: [1, 2, 3, 5, 10, 20]
-    folds: 3
+
+experiment_design:
+  base_pipeline: em_v46
+  filter_order:
+    - constant
+    - minimum_active_frequency
+    - exact_duplicate
+    - high_correlation_candidate
+    - lower_class_impact_within_redundant_group
+  representative_priority:
+    - class_association
+    - fold_selection_stability
+    - mutation_frequency
+    - name_based_clinical_interpretability_proxy
+    - low_raw_missing_rate
+  support_candidates: [1, 2, 3, 5, 10, 20]
+  support_selection_metric: mean_macro_f1_then_lower_fold_std
+  fit_statistics_within_fold: true
+  preserve_original_subclass: true
+  external_data_used: false
+  test_fit_used: false
+
+output:
+  submission_dir: submissions
+  experiment_dir: experiments
+
 record:
   status: design_only
   training_performed: false
