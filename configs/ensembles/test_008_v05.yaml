@@ -1,5 +1,6 @@
+# E10B-1: E10 + TF-IDF only
 project:
-  experiment_name: test_006_v05
+  experiment_name: test_008_v05
 
 data:
   raw_dir: data/raw
@@ -9,11 +10,11 @@ data:
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e10_dir: data/processed/test_006_v03
-  tfidf_dir: data/processed/test_006_v05_tfidf
+  e10_dir: data/processed/test_002_v10
+  tfidf_dir: data/processed/test_008_v05_tfidf
   tfidf_oof_file: jsj_oof_decision_by_seed.npy
   tfidf_test_file: jsj_test_decision_by_seed_fold.npy
-  output_dir: data/processed/test_006_v05
+  output_dir: data/processed/test_008_v05
 
 validation:
   n_splits: 3

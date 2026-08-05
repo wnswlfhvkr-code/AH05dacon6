@@ -85,19 +85,19 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
 
     if config_path.parent.name == "ensembles":
         experiment_name = config["project"]["experiment_name"]
-        test_006_runners = {
-            "test_006_v01": "train_jh_e8b.py",
-            "test_006_v02": "train_jh_e8c.py",
-            "test_006_v03": "train_jh_e10.py",
-            "test_006_v04": "train_jh_e10a.py",
-            "test_006_v05": "train_jh_e10b1.py",
+        test_008_runners = {
+            "test_008_v01": "train_jh_e8b.py",
+            "test_008_v02": "train_jh_e8c.py",
+            "test_008_v03": "train_jh_e10.py",
+            "test_008_v04": "train_jh_e10a.py",
+            "test_008_v05": "train_jh_e10b1.py",
         }
-        if experiment_name in test_006_runners:
+        if experiment_name in test_008_runners:
             assert (
                 ROOT
                 / "src"
                 / "ensembles"
-                / test_006_runners[experiment_name]
+                / test_008_runners[experiment_name]
             ).is_file()
             return
 

@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/ensembles/test_006_v02.yaml"),
+        default=Path("configs/ensembles/test_008_v02.yaml"),
     )
     args = parser.parse_args()
     run_em16_ensemble(args.config)

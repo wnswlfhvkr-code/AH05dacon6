@@ -1,5 +1,5 @@
 project:
-  experiment_name: test_006_v01
+  experiment_name: test_008_v01
 
 data:
   raw_dir: data/raw
@@ -9,15 +9,15 @@ data:
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e7_dir: data/processed/test_002_v08
-  e8_dir: data/processed/test_002_v09
-  e8a_dir: data/processed/test_006
+  e7_dir: data/processed/test_002_v07
+  e8_dir: data/processed/test_002_v08
+  e8a_dir: data/processed/test_002_e8a
   em16_dir: data/processed/test_006_v01_em16
   em16_oof_files:
     - em16_oof_probability.npy
   em16_test_files:
     - em16_test_probability_mean.npy
-  output_dir: data/processed/test_006_v01
+  output_dir: data/processed/test_008_v01
 
 validation:
   n_splits: 3
