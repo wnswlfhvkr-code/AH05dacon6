@@ -17,22 +17,10 @@ from src.pipelines.base import PreprocessingPipeline
 from src.pipelines.pipeline_em_v46 import EMV46PreprocessingPipeline
 
 
-SELECTION_RULES = {
-    "g01_class_association",
-    "g02_fold_stability",
-    "g03_mutation_frequency",
-    "g04_interpretability",
-    "g05_missing_bias",
-}
-
-
 class EMV46RedundancyFilterEngine:
     """V46 피처를 정해진 순서로 줄이고 학습 fold의 선택 상태를 보존합니다."""
 
-    def __init__(self, selection_rule: str, parameters: dict[str, object]) -> None:
-        if selection_rule not in SELECTION_RULES:
-            raise ValueError(f"지원하지 않는 고상관 선택 기준입니다: {selection_rule}")
-        self.selection_rule = selection_rule
+    def __init__(self, parameters: dict[str, object]) -> None:
         self.min_active_count = int(parameters.get("min_active_count", 5))
         self.correlation_threshold = float(parameters.get("correlation_threshold", 0.90))
         self.correlation_max_features = int(parameters.get("correlation_max_features", 3000))
@@ -82,7 +70,7 @@ class EMV46RedundancyFilterEngine:
             "fold-train 최소 활성 빈도 필터",
             "완전히 동일한 피처 제거",
             f"|상관계수| >= {self.correlation_threshold:.2f} 후보 탐색",
-            f"{self.selection_rule} 기준 대표 피처 유지",
+            "클래스 연관성·fold 안정성·빈도·해석성·결측 편향 순으로 대표 유지",
             "validation/test에는 train-fit 선택 열만 적용",
             "원본 SUBCLASS 유지",
         )
@@ -158,23 +146,12 @@ class EMV46RedundancyFilterEngine:
         interpretability: dict[str, float],
         missing_rate: dict[str, float],
     ) -> tuple[float, ...]:
-        metrics = {
-            "g01_class_association": float(association[column]),
-            "g02_fold_stability": float(stability[column]),
-            "g03_mutation_frequency": float(support[column]),
-            "g04_interpretability": float(interpretability[column]),
-            "g05_missing_bias": -float(missing_rate[column]),
-        }
-        secondary_order = (
-            "g01_class_association",
-            "g02_fold_stability",
-            "g03_mutation_frequency",
-            "g04_interpretability",
-            "g05_missing_bias",
-        )
         return (
-            metrics[self.selection_rule],
-            *(metrics[name] for name in secondary_order if name != self.selection_rule),
+            float(association[column]),
+            float(stability[column]),
+            float(support[column]),
+            float(interpretability[column]),
+            -float(missing_rate[column]),
             -float(len(column)),
         )
 
@@ -213,15 +190,14 @@ class EMV46RedundancyFilterEngine:
     def _high_correlation_groups(
         self,
         frame: pd.DataFrame,
-        association: dict[str, float],
-        stability: dict[str, float],
+        priority,
     ) -> list[list[str]]:
         if frame.shape[1] < 2:
             self.correlation_candidate_count_ = frame.shape[1]
             return []
         candidate_rank = sorted(
             frame.columns,
-            key=lambda column: (association[column], stability[column]),
+            key=priority,
             reverse=True,
         )[: self.correlation_max_features]
         self.correlation_candidate_count_ = len(candidate_rank)
@@ -298,7 +274,7 @@ class EMV46RedundancyFilterEngine:
         )
 
         frame, self.dropped_exact_duplicate_ = self._drop_exact_duplicates(frame, priority)
-        groups = self._high_correlation_groups(frame, association, stability)
+        groups = self._high_correlation_groups(frame, priority)
         self.high_correlation_group_count_ = len(groups)
         self.dropped_high_correlation_ = []
         for group in groups:

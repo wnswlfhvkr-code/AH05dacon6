@@ -1,0 +1,18 @@
+project: {name: AH05dacon6, experiment_name: test_006_em_H02, seed: 42}
+execution: {status: design_only, train: false, evaluate: false, implementation_status: ready}
+data: {raw_dir: data/raw, processed_dir: data/processed, train_file: train.csv, test_file: test.csv, submission_file: sample_submission.csv, target_column: SUBCLASS, id_column: ID}
+preprocessing:
+  name: em_H02
+  min_mutation_count: 5
+  k_features: 1500
+model: {name: xgboost, objective: 'multi:softprob', n_estimators: 450, learning_rate: 0.025, max_depth: 3, min_child_weight: 10.0, subsample: 0.70, colsample_bytree: 0.45, reg_alpha: 2.0, reg_lambda: 20.0, early_stopping_rounds: 30, eval_metric: mlogloss, tree_method: hist, n_jobs: -1}
+training: {validation_fraction: 0.2, stratify: true, metric: macro_f1, overfit_threshold: 0.1}
+experiment_design:
+  base_pipeline: em_v46
+  case: chi_square_top_k
+  dimension_candidates: [1000, 1500, 2000]
+  selected_dimension: 1500
+  supervised_selection_fit_within_fold: true
+  test_fit_used: false
+  external_data_used: false
+record: {status: design_only, training_performed: false, evaluation_performed: false, external_data_used: false}

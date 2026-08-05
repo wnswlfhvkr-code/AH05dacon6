@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import softmax
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
-from src.pipelines.pipeline_pipeComb_em_v1_006 import OOFStackingFeatureBundle
+from src.pipelines.em_preprocessing.pipeline_pipeComb_em_v1_006 import OOFStackingFeatureBundle
 
 
 class PipeCombOOFStackingClassifier:
@@ -22,8 +22,29 @@ class PipeCombOOFStackingClassifier:
             raise ValueError("stacking_folds는 2 이상이어야 합니다.")
 
         self.text_config = dict(model_config.get("text_linear_svc", {}))
-        self.xgb_config = dict(model_config.get("emv45_xgboost", {}))
-        self.lgbm_config = dict(model_config.get("emv45_lightgbm", {}))
+        self.xgb_config = dict(
+            model_config.get(
+                "emv46_xgboost",
+                model_config.get("emv45_xgboost", {}),
+            )
+        )
+        self.lgbm_config = dict(
+            model_config.get(
+                "emv46_lightgbm",
+                model_config.get("emv45_lightgbm", {}),
+            )
+        )
+        self.xgb_early_stopping_rounds = int(
+            self.xgb_config.pop("early_stopping_rounds", 0) or 0
+        )
+        self.lgbm_early_stopping_rounds = int(
+            self.lgbm_config.pop("early_stopping_rounds", 0) or 0
+        )
+        self.early_stopping_fraction = float(
+            model_config.get("early_stopping_fraction", 0.15)
+        )
+        if not 0.0 < self.early_stopping_fraction < 0.5:
+            raise ValueError("early_stopping_fraction은 0보다 크고 0.5보다 작아야 합니다.")
         self.meta_config = dict(model_config.get("meta_learner", {}))
         self.text_temperature = float(model_config.get("text_temperature", 1.20))
         self.xgb_temperature = float(model_config.get("xgboost_temperature", 1.15))
@@ -39,6 +60,8 @@ class PipeCombOOFStackingClassifier:
         self.meta_model = None
         self.inner_oof_rows_ = 0
         self.meta_feature_count_ = 0
+        self.selected_xgb_estimators_ = 0
+        self.selected_lgbm_estimators_ = 0
 
     @staticmethod
     def _require_bundle(features) -> OOFStackingFeatureBundle:
@@ -59,7 +82,12 @@ class PipeCombOOFStackingClassifier:
         parameters["random_state"] = self.seed + seed_offset
         return LinearSVC(**parameters)
 
-    def _create_xgboost(self, seed_offset: int = 0):
+    def _create_xgboost(
+        self,
+        seed_offset: int = 0,
+        n_estimators: int | None = None,
+        enable_early_stopping: bool = False,
+    ):
         try:
             from xgboost import XGBClassifier
         except ImportError as error:
@@ -77,10 +105,18 @@ class PipeCombOOFStackingClassifier:
         parameters.setdefault("eval_metric", "mlogloss")
         parameters.setdefault("tree_method", "hist")
         parameters.setdefault("n_jobs", -1)
+        if n_estimators is not None:
+            parameters["n_estimators"] = int(n_estimators)
+        if enable_early_stopping and self.xgb_early_stopping_rounds > 0:
+            parameters["early_stopping_rounds"] = self.xgb_early_stopping_rounds
         parameters["random_state"] = self.seed + seed_offset
         return XGBClassifier(**parameters)
 
-    def _create_lightgbm(self, seed_offset: int = 0):
+    def _create_lightgbm(
+        self,
+        seed_offset: int = 0,
+        n_estimators: int | None = None,
+    ):
         try:
             from lightgbm import LGBMClassifier
         except ImportError as error:
@@ -99,8 +135,37 @@ class PipeCombOOFStackingClassifier:
         parameters.setdefault("reg_lambda", 18.0)
         parameters.setdefault("n_jobs", -1)
         parameters.setdefault("verbosity", -1)
+        if n_estimators is not None:
+            parameters["n_estimators"] = int(n_estimators)
         parameters["random_state"] = self.seed + seed_offset
         return LGBMClassifier(**parameters)
+
+    @staticmethod
+    def _best_iteration_count(model, fallback: int) -> int:
+        for attribute in ("best_iteration", "best_iteration_"):
+            try:
+                value = int(getattr(model, attribute))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            if value >= 0:
+                # XGBoost best_iteration은 0부터, LightGBM best_iteration_은
+                # 1부터 시작합니다.
+                return value + 1 if attribute == "best_iteration" else value
+        return int(fallback)
+
+    def _early_stopping_indices(
+        self,
+        train_index: np.ndarray,
+        labels: np.ndarray,
+        fold: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        fit_index, stop_index = train_test_split(
+            train_index,
+            test_size=self.early_stopping_fraction,
+            random_state=self.seed + 10_000 + fold,
+            stratify=labels[train_index],
+        )
+        return np.asarray(fit_index), np.asarray(stop_index)
 
     @staticmethod
     def _temperature_scale(probabilities: np.ndarray, temperature: float) -> np.ndarray:
@@ -163,15 +228,66 @@ class PipeCombOOFStackingClassifier:
         xgb_oof = np.zeros_like(text_oof)
         lgbm_oof = np.zeros_like(text_oof)
         splitter = StratifiedKFold(n_splits=folds, shuffle=True, random_state=self.seed)
+        xgb_best_counts: list[int] = []
+        lgbm_best_counts: list[int] = []
 
         for fold, (train_index, valid_index) in enumerate(splitter.split(np.zeros(rows), y)):
             offset = 100 * (fold + 1)
             text_model = self._create_text_model(offset)
-            xgb_model = self._create_xgboost(offset + 1)
+            early_stop_enabled = (
+                self.xgb_early_stopping_rounds > 0
+                or self.lgbm_early_stopping_rounds > 0
+            )
+            if early_stop_enabled:
+                fit_index, stop_index = self._early_stopping_indices(
+                    train_index, y, fold
+                )
+            else:
+                fit_index, stop_index = train_index, np.asarray([], dtype="int64")
+            xgb_model = self._create_xgboost(
+                offset + 1,
+                enable_early_stopping=self.xgb_early_stopping_rounds > 0,
+            )
             lgbm_model = self._create_lightgbm(offset + 2)
             text_model.fit(bundle.text[train_index], y[train_index])
-            xgb_model.fit(bundle.tree[train_index], y[train_index])
-            lgbm_model.fit(bundle.tree[train_index], y[train_index])
+            if self.xgb_early_stopping_rounds > 0:
+                xgb_model.fit(
+                    bundle.tree[fit_index],
+                    y[fit_index],
+                    eval_set=[(bundle.tree[stop_index], y[stop_index])],
+                    verbose=False,
+                )
+            else:
+                xgb_model.fit(bundle.tree[train_index], y[train_index])
+            if self.lgbm_early_stopping_rounds > 0:
+                from lightgbm import early_stopping, log_evaluation
+
+                lgbm_model.fit(
+                    bundle.tree[fit_index],
+                    y[fit_index],
+                    eval_X=bundle.tree[stop_index],
+                    eval_y=y[stop_index],
+                    eval_metric="multi_logloss",
+                    callbacks=[
+                        early_stopping(
+                            self.lgbm_early_stopping_rounds,
+                            verbose=False,
+                        ),
+                        log_evaluation(period=0),
+                    ],
+                )
+            else:
+                lgbm_model.fit(bundle.tree[train_index], y[train_index])
+            xgb_best_counts.append(
+                self._best_iteration_count(
+                    xgb_model, self.xgb_config.get("n_estimators", 350)
+                )
+            )
+            lgbm_best_counts.append(
+                self._best_iteration_count(
+                    lgbm_model, self.lgbm_config.get("n_estimators", 280)
+                )
+            )
 
             text_oof[valid_index] = self._align_probabilities(
                 self._text_probabilities(text_model, bundle.text[valid_index]),
@@ -199,9 +315,15 @@ class PipeCombOOFStackingClassifier:
         self.meta_model = self._create_meta_model()
         self.meta_model.fit(scaled_meta, y)
 
+        self.selected_xgb_estimators_ = int(np.median(xgb_best_counts))
+        self.selected_lgbm_estimators_ = int(np.median(lgbm_best_counts))
         self.text_model = self._create_text_model()
-        self.xgb_model = self._create_xgboost(1)
-        self.lgbm_model = self._create_lightgbm(2)
+        self.xgb_model = self._create_xgboost(
+            1, n_estimators=self.selected_xgb_estimators_
+        )
+        self.lgbm_model = self._create_lightgbm(
+            2, n_estimators=self.selected_lgbm_estimators_
+        )
         self.text_model.fit(bundle.text, y)
         self.xgb_model.fit(bundle.tree, y)
         self.lgbm_model.fit(bundle.tree, y)
@@ -254,6 +376,10 @@ class PipeCombOOFStackingClassifier:
             "stacking_folds": self.stacking_folds,
             "meta_features": self.meta_feature_count_,
             "inner_oof_rows": self.inner_oof_rows_,
+            "xgboost_early_stopping_rounds": self.xgb_early_stopping_rounds,
+            "lightgbm_early_stopping_rounds": self.lgbm_early_stopping_rounds,
+            "selected_xgboost_estimators": self.selected_xgb_estimators_,
+            "selected_lightgbm_estimators": self.selected_lgbm_estimators_,
         }
 
 
