@@ -1,4 +1,9 @@
-"""EMV46·JSJ9 통합 로직을 Outer 5-fold 실험에 적용한 pipeComb EM v2_001."""
+"""EMV46·JSJ9·JYP9을 중복 없이 통합한 독립형 pipeComb EM v3.
+
+JYP9의 F0~F4는 EMV46/JSJ9과 표현이 겹치므로 다시 만들지 않습니다.
+고유한 F7 클래스쌍 대비와 F9 전역 아미노산 치환 조성만 트리 뷰에
+추가하며, F7은 EMV46이 이미 만든 변이 행렬을 재사용합니다.
+"""
 
 from __future__ import annotations
 
@@ -34,6 +39,19 @@ FRAMESHIFT_PATTERN = re.compile(r"FS", re.IGNORECASE)
 STOP_PATTERN = re.compile(r"(?:\*|TER$|X$)", re.IGNORECASE)
 INFRAME_PATTERN = re.compile(r"(?:DEL|INS|DUP|>|_)", re.IGNORECASE)
 SAFE_NAME_PATTERN = re.compile(r"[^A-Z0-9]+")
+STANDARD_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
+JYP9_AA_SUBSTITUTIONS = tuple(
+    f"{reference}>{alternate}"
+    for reference in STANDARD_AMINO_ACIDS
+    for alternate in STANDARD_AMINO_ACIDS
+    if reference != alternate
+)
+JYP9_AA_SUBSTITUTION_LOOKUP = {
+    transition: index for index, transition in enumerate(JYP9_AA_SUBSTITUTIONS)
+}
+JYP9_SIMPLE_SUBSTITUTION_PATTERN = re.compile(
+    rf"^([{STANDARD_AMINO_ACIDS}])(\d+)([{STANDARD_AMINO_ACIDS}])$"
+)
 
 
 @lru_cache(maxsize=None)
@@ -872,6 +890,7 @@ class _IntegratedEMV46PreprocessingPipeline(PreprocessingPipeline):
         self.derived_feature_counts_: dict[str, int] = {
             name: 0 for name in FEATURE_NAMES
         }
+        self.last_shared_: _SharedMatrices | None = None
         self.steps = (
             "EMV45 베이스 피처 1회 생성",
             "공통 토큰 수·consequence 행렬 1회 계산",
@@ -1237,6 +1256,7 @@ class _IntegratedEMV46PreprocessingPipeline(PreprocessingPipeline):
     ) -> _SharedMatrices:
         self.gene_columns_ = features.columns.tolist()
         shared = _shared_matrices(features, self.gene_columns_)
+        self.last_shared_ = shared
         self._learn_feature_states(features, labels, shared)
         return shared
 
@@ -1272,6 +1292,7 @@ class _IntegratedEMV46PreprocessingPipeline(PreprocessingPipeline):
 
     def transform(self, features: pd.DataFrame) -> pd.DataFrame:
         shared = _shared_matrices(features, self.gene_columns_)
+        self.last_shared_ = shared
         derived = self._select_derived_columns(
             self._derived_features(features, shared)
         )
@@ -1455,17 +1476,436 @@ class _JSJ9TextOnlyEngine:
         )
 
 
-class PipeCombEMV2001PreprocessingPipeline(PreprocessingPipeline):
-    """통합 EMV46 수치 뷰와 JSJ9 TF-IDF 텍스트 뷰를 반환합니다."""
+@dataclass(frozen=True)
+class _JYP9PairState:
+    """JYP9 F7의 한 클래스쌍에서 fold-train으로 학습한 상태입니다."""
 
-    name = "pipeComb_em_v2_001"
-    # v2와 달리 Outer 5-fold 평가를 유지하는 비교 실험입니다.
-    evaluation_folds = 5
+    first_label: str
+    second_label: str
+    selected_gene_indices: np.ndarray
+    mutation_log_odds: np.ndarray
+    mutation_probability_ratio: np.ndarray
+    wt_probability_ratio: np.ndarray
+
+
+class _JYP9UniqueFeatureEngine:
+    """JYP9 고유 F7·F9만 생성하고 EM46 중복 블록은 생략합니다.
+
+    F7은 EM46 공통 ``event_counts``에서 유전자 변이 여부를 재사용하고,
+    레이블 의존 통계는 학습 행에 대해 내부 OOF로 생성합니다. F9만 원본
+    문자열을 한 번 가볍게 훑어 380개 표준 아미노산 치환 count를 만듭니다.
+    """
+
+    def __init__(
+        self,
+        f7_pairs: list[list[str]] | tuple[tuple[str, str], ...] = (
+            ("KIRC", "KIPAN"),
+            ("LGG", "GBMLGG"),
+        ),
+        f7_top_k_per_direction: int = 3,
+        f7_min_gene_support: int = 10,
+        f7_laplace_alpha: float = 4.0,
+        f7_burden_quantiles: int = 5,
+        f7_stability_folds: int = 5,
+        f7_min_direction_consistency: int = 4,
+        f7_min_selection_frequency: int = 3,
+        f7_oof_folds: int = 5,
+        f7_random_state: int = 42,
+        f9_min_transition_support: int = 1,
+        f9_max_transitions: int = 380,
+        f9_burden_normalize: bool = False,
+        **_: object,
+    ) -> None:
+        pairs = tuple((str(pair[0]), str(pair[1])) for pair in f7_pairs)
+        if not pairs or any(len(pair) != 2 or pair[0] == pair[1] for pair in pairs):
+            raise ValueError("JYP9 F7 pair는 서로 다른 두 레이블로 구성해야 합니다.")
+        if len(set(pairs)) != len(pairs):
+            raise ValueError("JYP9 F7 pair에 중복이 있습니다.")
+        if f7_top_k_per_direction < 1 or f7_min_gene_support < 1:
+            raise ValueError("JYP9 F7 top-K와 최소 support는 1 이상이어야 합니다.")
+        if f7_laplace_alpha <= 0 or f7_burden_quantiles < 2:
+            raise ValueError("JYP9 F7 alpha는 양수, burden quantile은 2 이상이어야 합니다.")
+        if f7_stability_folds < 4 or f7_oof_folds < 2:
+            raise ValueError("JYP9 F7 stability는 4-fold, OOF는 2-fold 이상이어야 합니다.")
+        if not 1 <= f7_min_direction_consistency <= f7_stability_folds:
+            raise ValueError("JYP9 F7 direction consistency 범위가 잘못되었습니다.")
+        if not 1 <= f7_min_selection_frequency <= f7_stability_folds:
+            raise ValueError("JYP9 F7 selection frequency 범위가 잘못되었습니다.")
+        if f9_min_transition_support < 1:
+            raise ValueError("JYP9 F9 최소 표본 support는 1 이상이어야 합니다.")
+        if not 1 <= f9_max_transitions <= len(JYP9_AA_SUBSTITUTIONS):
+            raise ValueError(
+                f"JYP9 F9 최대 치환 수는 1~{len(JYP9_AA_SUBSTITUTIONS)}여야 합니다."
+            )
+        self.pairs = pairs
+        self.top_k = int(f7_top_k_per_direction)
+        self.min_support = int(f7_min_gene_support)
+        self.alpha = float(f7_laplace_alpha)
+        self.burden_quantiles = int(f7_burden_quantiles)
+        self.stability_folds = int(f7_stability_folds)
+        self.min_direction_consistency = int(f7_min_direction_consistency)
+        self.min_selection_frequency = int(f7_min_selection_frequency)
+        self.oof_folds = int(f7_oof_folds)
+        self.random_state = int(f7_random_state)
+        self.f9_min_transition_support = int(f9_min_transition_support)
+        self.f9_max_transitions = int(f9_max_transitions)
+        self.f9_burden_normalize = bool(f9_burden_normalize)
+        self.feature_columns: list[str] = []
+        self.pair_states_: tuple[_JYP9PairState, ...] = ()
+        self.f7_feature_count_ = len(self.pairs) * 2
+        self.f9_selected_indices_ = np.arange(
+            len(JYP9_AA_SUBSTITUTIONS), dtype="int64"
+        )
+        self.f9_support_ = np.zeros(len(JYP9_AA_SUBSTITUTIONS), dtype="int64")
+        self.f9_feature_count_ = len(self.f9_selected_indices_)
+
+    @staticmethod
+    def _mutation_matrix(shared: _SharedMatrices) -> csr_matrix:
+        return csr_matrix(
+            shared.event_counts.gt(0).to_numpy(dtype="float32", copy=False)
+        )
+
+    def _probabilities(
+        self,
+        matrix: csr_matrix,
+        binary_labels: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        first = binary_labels == 0
+        second = ~first
+        first_count = np.asarray(matrix[first].sum(axis=0)).ravel()
+        second_count = np.asarray(matrix[second].sum(axis=0)).ravel()
+        first_probability = (first_count + self.alpha) / (
+            first.sum() + 2.0 * self.alpha
+        )
+        second_probability = (second_count + self.alpha) / (
+            second.sum() + 2.0 * self.alpha
+        )
+        log_odds = (
+            np.log(first_probability)
+            - np.log1p(-first_probability)
+            - np.log(second_probability)
+            + np.log1p(-second_probability)
+        )
+        return first_probability, second_probability, log_odds, first_count + second_count
+
+    def _burden_adjusted_effect(
+        self,
+        matrix: csr_matrix,
+        binary_labels: np.ndarray,
+    ) -> np.ndarray:
+        burden = np.asarray(matrix.sum(axis=1)).ravel()
+        boundaries = np.quantile(
+            burden, np.arange(1, self.burden_quantiles) / self.burden_quantiles
+        )
+        strata = np.searchsorted(boundaries, burden, side="left")
+        weighted = np.zeros(matrix.shape[1], dtype="float64")
+        total_weight = np.zeros(matrix.shape[1], dtype="float64")
+        for stratum in range(self.burden_quantiles):
+            first = (binary_labels == 0) & (strata == stratum)
+            second = (binary_labels == 1) & (strata == stratum)
+            if not first.any() or not second.any():
+                continue
+            first_count = np.asarray(matrix[first].sum(axis=0)).ravel()
+            second_count = np.asarray(matrix[second].sum(axis=0)).ravel()
+            first_probability = (first_count + self.alpha) / (
+                first.sum() + 2.0 * self.alpha
+            )
+            second_probability = (second_count + self.alpha) / (
+                second.sum() + 2.0 * self.alpha
+            )
+            effect = (
+                np.log(first_probability)
+                - np.log1p(-first_probability)
+                - np.log(second_probability)
+                + np.log1p(-second_probability)
+            )
+            weight = float(first.sum() * second.sum()) / float(first.sum() + second.sum())
+            weighted += effect * weight
+            total_weight += weight
+        return np.divide(
+            weighted,
+            total_weight,
+            out=np.zeros_like(weighted),
+            where=total_weight > 0,
+        )
+
+    @staticmethod
+    def _rank(
+        effect: np.ndarray,
+        eligible: np.ndarray,
+        gene_names: np.ndarray,
+        direction: int,
+        top_k: int,
+    ) -> np.ndarray:
+        candidates = np.flatnonzero(eligible & (effect * direction > 0))
+        if not len(candidates):
+            return np.empty(0, dtype="int64")
+        order = np.lexsort((gene_names[candidates], -(effect[candidates] * direction)))
+        return candidates[order[:top_k]].astype("int64", copy=False)
+
+    def _fit_pair(
+        self,
+        matrix: csr_matrix,
+        labels: np.ndarray,
+        gene_names: np.ndarray,
+        first_label: str,
+        second_label: str,
+        random_state: int,
+    ) -> _JYP9PairState:
+        pair_rows = (labels == first_label) | (labels == second_label)
+        pair_matrix = matrix[pair_rows]
+        pair_labels = np.where(labels[pair_rows] == first_label, 0, 1).astype("int8")
+        class_sizes = np.bincount(pair_labels, minlength=2)
+        if np.any(class_sizes < self.stability_folds):
+            raise ValueError(
+                f"JYP9 F7 {first_label}-{second_label}에는 클래스별 "
+                f"최소 {self.stability_folds}개 표본이 필요합니다."
+            )
+        first_probability, second_probability, log_odds, support = self._probabilities(
+            pair_matrix, pair_labels
+        )
+        full_effect = self._burden_adjusted_effect(pair_matrix, pair_labels)
+        full_direction = np.sign(full_effect)
+        direction_count = np.zeros(matrix.shape[1], dtype="int16")
+        selection_count = np.zeros(matrix.shape[1], dtype="int16")
+        splitter = StratifiedKFold(
+            n_splits=self.stability_folds,
+            shuffle=True,
+            random_state=random_state,
+        )
+        for train_positions, _ in splitter.split(pair_matrix, pair_labels):
+            fold_matrix = pair_matrix[train_positions]
+            fold_labels = pair_labels[train_positions]
+            fold_effect = self._burden_adjusted_effect(fold_matrix, fold_labels)
+            _, _, _, fold_support = self._probabilities(fold_matrix, fold_labels)
+            direction_count += (
+                (full_direction != 0) & (np.sign(fold_effect) == full_direction)
+            ).astype("int16")
+            for direction in (1, -1):
+                chosen = self._rank(
+                    fold_effect,
+                    fold_support >= self.min_support,
+                    gene_names,
+                    direction,
+                    self.top_k,
+                )
+                selection_count[chosen] += 1
+        stable = (
+            (support >= self.min_support)
+            & (direction_count >= self.min_direction_consistency)
+            & (selection_count >= self.min_selection_frequency)
+        )
+        selected = np.concatenate([
+            self._rank(full_effect, stable, gene_names, direction, self.top_k)
+            for direction in (1, -1)
+        ])
+        return _JYP9PairState(
+            first_label=first_label,
+            second_label=second_label,
+            selected_gene_indices=selected,
+            mutation_log_odds=log_odds[selected],
+            mutation_probability_ratio=np.log(
+                first_probability[selected] / second_probability[selected]
+            ),
+            wt_probability_ratio=np.log(
+                (1.0 - first_probability[selected])
+                / (1.0 - second_probability[selected])
+            ),
+        )
+
+    def _fit_states(
+        self,
+        matrix: csr_matrix,
+        labels: np.ndarray,
+        random_state: int,
+    ) -> tuple[_JYP9PairState, ...]:
+        available = set(labels)
+        absent = sorted({label for pair in self.pairs for label in pair} - available)
+        if absent:
+            raise ValueError(f"JYP9 F7 학습 fold에 없는 레이블입니다: {absent}")
+        names = np.asarray(self.feature_columns, dtype=object)
+        return tuple(
+            self._fit_pair(matrix, labels, names, first, second, random_state)
+            for first, second in self.pairs
+        )
+
+    @staticmethod
+    def _pair_matrix(
+        matrix: csr_matrix,
+        states: tuple[_JYP9PairState, ...],
+    ) -> csr_matrix:
+        columns: list[np.ndarray] = []
+        for state in states:
+            if not len(state.selected_gene_indices):
+                columns.extend((np.zeros(matrix.shape[0]), np.zeros(matrix.shape[0])))
+                continue
+            mutated = matrix[:, state.selected_gene_indices].toarray() > 0
+            mutated_count = mutated.sum(axis=1)
+            log_odds_sum = (mutated * state.mutation_log_odds[None, :]).sum(axis=1)
+            log_odds_mean = np.divide(
+                log_odds_sum,
+                mutated_count,
+                out=np.zeros(matrix.shape[0], dtype="float64"),
+                where=mutated_count > 0,
+            )
+            likelihood = np.where(
+                mutated,
+                state.mutation_probability_ratio[None, :],
+                state.wt_probability_ratio[None, :],
+            ).mean(axis=1)
+            columns.extend((log_odds_mean, likelihood))
+        return csr_matrix(np.column_stack(columns).astype("float32", copy=False))
+
+    def _oof_pair_matrix(
+        self,
+        matrix: csr_matrix,
+        labels: np.ndarray,
+    ) -> csr_matrix:
+        smallest_class = int(pd.Series(labels).value_counts().min())
+        folds = min(self.oof_folds, smallest_class)
+        if folds < 2:
+            raise ValueError("JYP9 F7 OOF에는 클래스별 표본이 최소 2개 필요합니다.")
+        output = np.zeros((matrix.shape[0], self.f7_feature_count_), dtype="float32")
+        splitter = StratifiedKFold(
+            n_splits=folds, shuffle=True, random_state=self.random_state
+        )
+        for fold, (train_positions, valid_positions) in enumerate(
+            splitter.split(matrix, labels), start=1
+        ):
+            states = self._fit_states(
+                matrix[train_positions],
+                labels[train_positions],
+                self.random_state + fold,
+            )
+            output[valid_positions] = self._pair_matrix(
+                matrix[valid_positions], states
+            ).toarray()
+        return csr_matrix(output)
+
+    def _raw_f9_matrix(self, features: pd.DataFrame) -> csr_matrix:
+        missing = set(self.feature_columns) - set(features.columns)
+        if missing:
+            raise ValueError(f"JYP9 변환에 필요한 유전자 컬럼이 없습니다: {sorted(missing)}")
+        values = features[self.feature_columns].to_numpy(dtype=object, copy=False)
+        candidate_rows, candidate_columns = np.nonzero(
+            ~(pd.isna(values) | (values == "WT"))
+        )
+        rows: list[int] = []
+        columns: list[int] = []
+        for row, column in zip(candidate_rows, candidate_columns):
+            for token, _ in split_unique_mutations(str(values[row, column])):
+                match = JYP9_SIMPLE_SUBSTITUTION_PATTERN.fullmatch(token)
+                if match is None or match.group(1) == match.group(3):
+                    continue
+                transition = f"{match.group(1)}>{match.group(3)}"
+                rows.append(int(row))
+                columns.append(JYP9_AA_SUBSTITUTION_LOOKUP[transition])
+        output = csr_matrix(
+            (
+                np.ones(len(rows), dtype="float32"),
+                (np.asarray(rows, dtype="int32"), np.asarray(columns, dtype="int32")),
+            ),
+            shape=(len(features), len(JYP9_AA_SUBSTITUTIONS)),
+            dtype="float32",
+        )
+        output.sum_duplicates()
+        return output
+
+    def _fit_f9_state(self, raw: csr_matrix) -> None:
+        """Fold-train 표본 support로 F9 스키마를 고정합니다."""
+        support = np.asarray(raw.getnnz(axis=0), dtype="int64")
+        self.f9_support_ = support
+        if (
+            self.f9_min_transition_support == 1
+            and self.f9_max_transitions == len(JYP9_AA_SUBSTITUTIONS)
+            and not self.f9_burden_normalize
+        ):
+            self.f9_selected_indices_ = np.arange(
+                len(JYP9_AA_SUBSTITUTIONS), dtype="int64"
+            )
+            self.f9_feature_count_ = len(self.f9_selected_indices_)
+            return
+        eligible = np.flatnonzero(support >= self.f9_min_transition_support)
+        if not len(eligible):
+            raise ValueError("JYP9 F9 최소 support를 만족하는 치환쌍이 없습니다.")
+        order = np.lexsort((eligible, -support[eligible]))
+        self.f9_selected_indices_ = eligible[order[: self.f9_max_transitions]]
+        self.f9_feature_count_ = len(self.f9_selected_indices_)
+
+    def _apply_f9_state(self, raw: csr_matrix) -> csr_matrix:
+        output = raw[:, self.f9_selected_indices_].tocsr(copy=True)
+        output.data = np.log1p(output.data).astype("float32", copy=False)
+        if self.f9_burden_normalize:
+            row_total = np.asarray(output.sum(axis=1)).ravel()
+            inverse = np.divide(
+                1.0,
+                row_total,
+                out=np.zeros_like(row_total, dtype="float32"),
+                where=row_total > 0,
+            )
+            output = output.multiply(inverse[:, None]).tocsr()
+        return output
+
+    def _f9_matrix(self, features: pd.DataFrame) -> csr_matrix:
+        return self._apply_f9_state(self._raw_f9_matrix(features))
+
+    def fit(
+        self,
+        shared: _SharedMatrices,
+        features: pd.DataFrame,
+        labels: pd.Series,
+    ) -> "_JYP9UniqueFeatureEngine":
+        self.feature_columns = features.columns.tolist()
+        matrix = self._mutation_matrix(shared)
+        self.pair_states_ = self._fit_states(
+            matrix, labels.astype(str).to_numpy(), self.random_state
+        )
+        self._fit_f9_state(self._raw_f9_matrix(features))
+        return self
+
+    def fit_transform(
+        self,
+        shared: _SharedMatrices,
+        features: pd.DataFrame,
+        labels: pd.Series,
+    ) -> csr_matrix:
+        self.feature_columns = features.columns.tolist()
+        mutation = self._mutation_matrix(shared)
+        label_values = labels.astype(str).to_numpy()
+        self.pair_states_ = self._fit_states(
+            mutation, label_values, self.random_state
+        )
+        raw_f9 = self._raw_f9_matrix(features)
+        self._fit_f9_state(raw_f9)
+        pair = self._oof_pair_matrix(mutation, label_values)
+        return hstack((pair, self._apply_f9_state(raw_f9)), format="csr")
+
+    def transform(
+        self,
+        shared: _SharedMatrices,
+        features: pd.DataFrame,
+    ) -> csr_matrix:
+        mutation = self._mutation_matrix(shared)
+        return hstack(
+            (self._pair_matrix(mutation, self.pair_states_), self._f9_matrix(features)),
+            format="csr",
+        )
+
+    def feature_count(self) -> int:
+        return self.f7_feature_count_ + self.f9_feature_count_
+
+
+class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
+    """EMV46 tree·JSJ9 text·JYP9 고유 tree 피처를 반환합니다."""
+
+    name = "pipeComb_em_v3"
+    evaluation_folds = 1
 
     def __init__(
         self,
         emv46_parameters: dict[str, object] | None = None,
         text_parameters: dict[str, object] | None = None,
+        jyp9_parameters: dict[str, object] | None = None,
         **parameters: object,
     ) -> None:
         super().__init__()
@@ -1473,17 +1913,24 @@ class PipeCombEMV2001PreprocessingPipeline(PreprocessingPipeline):
         em_config.update(emv46_parameters or {})
         text_config = dict(parameters)
         text_config.update(text_parameters or {})
+        jyp9_config = dict(parameters)
+        jyp9_config.update(jyp9_parameters or {})
         self.emv46_pipeline = _IntegratedEMV46PreprocessingPipeline(**em_config)
         self.jsj9_text_engine = _JSJ9TextOnlyEngine(**text_config)
+        self.jyp9_unique_engine = _JYP9UniqueFeatureEngine(**jyp9_config)
         self.emv46_feature_count_ = 0
         self.jsj9_text_feature_count_ = 0
+        self.jyp9_unique_feature_count_ = 0
         self.combined_feature_count_ = 0
         self.steps = (
             "내장 EMV46 수치 피처 1회 생성",
             "JSJ9 Word·Char TF-IDF 문서·행렬 1회 생성",
             "중복 JSJ9 tree 생성 경로 제거",
+            "JYP9 F0~F4 중복 블록 생성 제거",
+            "EM46 변이 행렬을 재사용한 JYP9 F7 내부 OOF pair contrast",
+            "JYP9 F9 fold-train support 선택·최대 380개 log1p count",
             "LinearSVC text·XGBoost/LightGBM tree 뷰 분리",
-            "Outer 5-fold·Inner 5-fold 중첩 OOF stacking 입력 제공",
+            "단일 레벨 OOF stacking 입력 제공",
             "fold-train에서만 모든 상태 fit",
             "원본 SUBCLASS 유지",
         )
@@ -1492,36 +1939,54 @@ class PipeCombEMV2001PreprocessingPipeline(PreprocessingPipeline):
         self,
         emv46_count: int | None = None,
         text_count: int | None = None,
+        jyp9_count: int | None = None,
     ) -> None:
         if emv46_count is not None:
             self.emv46_feature_count_ = int(emv46_count)
         if text_count is not None:
             self.jsj9_text_feature_count_ = int(text_count)
+        if jyp9_count is not None:
+            self.jyp9_unique_feature_count_ = int(jyp9_count)
         self.combined_feature_count_ = (
-            self.emv46_feature_count_ + self.jsj9_text_feature_count_
+            self.emv46_feature_count_
+            + self.jsj9_text_feature_count_
+            + self.jyp9_unique_feature_count_
         )
+
+    def _shared(self) -> _SharedMatrices:
+        shared = self.emv46_pipeline.last_shared_
+        if shared is None:
+            raise RuntimeError("EMV46 공통 변이 행렬이 준비되지 않았습니다.")
+        return shared
 
     def _bundle(
         self,
         emv46_features: pd.DataFrame,
         text_features: csr_matrix,
+        jyp9_features: csr_matrix,
     ) -> TextTreeFeatureBundle:
-        tree = csr_matrix(emv46_features.to_numpy(dtype="float32", copy=False))
+        emv46_tree = csr_matrix(
+            emv46_features.to_numpy(dtype="float32", copy=False)
+        )
+        jyp9_tree = jyp9_features.tocsr()
+        tree = hstack((emv46_tree, jyp9_tree), format="csr")
         text = text_features.tocsr()
-        self._update_counts(tree.shape[1], text.shape[1])
+        self._update_counts(emv46_tree.shape[1], text.shape[1], jyp9_tree.shape[1])
         return TextTreeFeatureBundle(text=text, tree=tree)
 
     def fit(
         self,
         features: pd.DataFrame,
         labels: pd.Series,
-    ) -> "PipeCombEMV2001PreprocessingPipeline":
+    ) -> "PipeCombEMV3PreprocessingPipeline":
         self.feature_columns = features.columns.tolist()
         self.emv46_pipeline.fit(features, labels)
         self.jsj9_text_engine.fit(features)
+        self.jyp9_unique_engine.fit(self._shared(), features, labels)
         self._update_counts(
             self.emv46_pipeline.summary()["remaining_features"],
             self.jsj9_text_engine.feature_count(),
+            self.jyp9_unique_engine.feature_count(),
         )
         self.label_encoder.fit(labels)
         return self
@@ -1534,22 +1999,39 @@ class PipeCombEMV2001PreprocessingPipeline(PreprocessingPipeline):
         self.feature_columns = features.columns.tolist()
         emv46 = self.emv46_pipeline.fit_transform(features, labels)
         text = self.jsj9_text_engine.fit_transform(features)
+        jyp9 = self.jyp9_unique_engine.fit_transform(
+            self._shared(), features, labels
+        )
         self.label_encoder.fit(labels)
-        return self._bundle(emv46, text)
+        return self._bundle(emv46, text, jyp9)
 
     def transform(self, features: pd.DataFrame) -> TextTreeFeatureBundle:
+        emv46 = self.emv46_pipeline.transform(features)
         return self._bundle(
-            self.emv46_pipeline.transform(features),
+            emv46,
             self.jsj9_text_engine.transform(features),
+            self.jyp9_unique_engine.transform(self._shared(), features),
         )
 
-    def summary(self) -> dict[str, int]:
+    def summary(self) -> dict[str, object]:
         return {
             "remaining_features": self.combined_feature_count_,
             "emv46_features": self.emv46_feature_count_,
             "jsj9_text_features": self.jsj9_text_feature_count_,
+            "jyp9_unique_features": self.jyp9_unique_feature_count_,
+            "jyp9_f7_pair_contrast_features": self.jyp9_unique_engine.f7_feature_count_,
+            "jyp9_f9_global_aa_pair_features": self.jyp9_unique_engine.f9_feature_count_,
+            "jyp9_f9_min_transition_support": (
+                self.jyp9_unique_engine.f9_min_transition_support
+            ),
+            "jyp9_f9_max_transitions": self.jyp9_unique_engine.f9_max_transitions,
+            "jyp9_f9_burden_normalize": (
+                self.jyp9_unique_engine.f9_burden_normalize
+            ),
             "removed_duplicate_jsj9_tree_features": 0,
             "jsj9_tree_generation_skipped": 1,
+            "jyp9_duplicate_blocks_skipped": 6,
+            "jyp9_reused_emv46_mutation_matrix": 1,
             "dropped_constant_features": int(
                 self.emv46_pipeline.summary().get("dropped_constant_features", 0)
             ),
