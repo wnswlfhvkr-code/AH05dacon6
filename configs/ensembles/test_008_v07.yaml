@@ -1,0 +1,80 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_008_v07
+  description: "E10B2 SGKF 3-seed + EMV45 single 8:2 split probability ensemble"
+  seed: 42
+  python_version: "3.12"
+
+execution:
+  status: ready
+  train: false
+  evaluate: true
+  implementation_status: ready
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+  e10b2:
+    experiment_name: test_008_v06
+    result_dir: test_008_v06
+    oof_file: oof_probabilities_by_seed.npy
+    test_file: test_probability_by_seed_fold.npy
+    ids_file: oof_ids.npy
+    classes_file: classes.npy
+
+  emv45:
+    experiment_name: test_006_E14
+    result_dir: test_006_E14
+    validation_file: validation_probabilities.npy
+    validation_ids_file: validation_ids.npy
+    test_probability_file: test_probabilities.npy
+    classes_file: classes.npy
+
+  output_dir: test_008_v07
+
+sources:
+  e10b2:
+    validation: stratified_group_kfold
+    seeds: [42, 2026, 777]
+    aggregate_seeds: mean
+    aggregate_folds: mean
+
+  emv45:
+    preprocessing: em_v45
+    validation: stratified_holdout
+    validation_fraction: 0.2
+    seed: 42
+
+ensemble:
+  method: weighted_probability_average
+
+  # weight는 E10B2에 적용하고, EMV45에는 1-weight를 적용
+  e10b2_weights:
+    - 0.40
+    - 0.50
+    - 0.60
+    - 0.70
+    - 0.80
+
+  selection_metric: macro_f1
+  evaluation_scope: emv45_validation_ids
+  align_by_id: true
+  align_class_order: true
+  normalize_probabilities: true
+  epsilon: 1.0e-12
+
+validation:
+  require_out_of_sample_predictions: true
+  bootstrap_repeats: 3000
+  bootstrap_seed: 20260805
+
+output:
+  submission_file: submission_test_008_v07.csv
+  summary_file: test_008_v07_summary.json
+  weight_scores_file: test_008_v07_weight_scores.csv

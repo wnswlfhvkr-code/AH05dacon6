@@ -1,7 +1,8 @@
-# E10 (E8+E9) linearSVC + LightGBM + TFIDF ensemble ensemble
-
 project:
   experiment_name: test_008_v03
+  description: "E10 (E8+E9) linearSVC + LightGBM + TFIDF ensemble"
+  python_version: "3.12"
+
 
 data:
   raw_dir: data/raw
@@ -11,8 +12,8 @@ data:
   target_column: SUBCLASS
   id_column: ID
   fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
-  e8_dir: data/processed/test_002_v08
-  e9_dir: data/processed/test_002_v09
+  e8_dir: data/processed/test_002_v09
+  e9_dir: data/processed/test_002_v10
   output_dir: data/processed/test_008_v03
 
 validation:

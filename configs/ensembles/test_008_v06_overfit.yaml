@@ -1,0 +1,54 @@
+project:
+  experiment_name: test_008_v06_overfit
+  parent_experiment: test_008_v06
+  description: "E10B-2 Numeric Structural LightGBM 과적합 진단 및 정규화 재검증"
+  task_type: diagnostic
+  python_version: "3.12"
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  test_file: test.csv
+  target_column: SUBCLASS
+  id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  output_dir: data/processed/test_008_v06_overfit
+
+validation:
+  strategy: StratifiedGroupKFold
+  n_splits: 3
+  seeds: [42, 2026, 777]
+
+public_result:
+  e10b2_local_oof_macro_f1: 0.514528
+  e10b2_public_macro_f1: 0.3566072157
+  public_gap: -0.157921
+
+original_model:
+  objective: multiclass
+  n_estimators: 1800
+  learning_rate: 0.025
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 18
+  subsample: 0.85
+  subsample_freq: 1
+  colsample_bytree: 0.75
+  reg_alpha: 0.15
+  reg_lambda: 0.50
+  early_stopping_rounds: 150
+
+regularized_model:
+  objective: multiclass
+  n_estimators: 2000
+  learning_rate: 0.02
+  num_leaves: 7
+  max_depth: 3
+  min_child_samples: 100
+  min_split_gain: 0.05
+  subsample: 0.70
+  subsample_freq: 1
+  colsample_bytree: 0.50
+  reg_alpha: 5.0
+  reg_lambda: 20.0
+  early_stopping_rounds: 100

@@ -1,6 +1,7 @@
-# E10A: E10 + TEST_004_7(jsj) ensemble
 project:
   experiment_name: test_008_v04
+  description: "E10A: E10 + TEST_004_7(jsj) ensemble
+  python_version: "3.12"
 
 data:
   raw_dir: data/raw
