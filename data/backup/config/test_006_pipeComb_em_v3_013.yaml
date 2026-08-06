@@ -1,0 +1,59 @@
+extends: test_006_pipeComb_em_v3_011.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_013
+  description: "v3_011 구조 유지 + outer-fold 학습 내부 OOF로 TabPFN 입력 차원 128/256/512/768 자동 선택"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  tabpfn:
+    max_features: 768
+    feature_count_candidates: [128, 256, 512, 768]
+    feature_count_selection_folds: 3
+    feature_count_score_tolerance: 0.0
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_011
+  unchanged_components:
+    - v3_008_fold_train_high_correlation_filter
+    - tabpfn_api_client
+    - tabpfn_required_base_model_subset_search
+    - text_xgboost_lightgbm_optional_removal
+    - regularized_meta_learner
+  change_only: nested_oof_tabpfn_feature_count_selection
+  feature_count_candidates: [128, 256, 512, 768]
+  candidate_scoring_model: tabpfn
+  candidate_metric: macro_f1
+  selection_scope: each_outer_stacking_fold_train_rows_only
+  inner_selection_folds: 3
+  outer_fold_validation_used_for_selection: false
+  final_full_train_count_policy: highest_mean_inner_oof_macro_f1_across_outer_folds
+  tie_break: smaller_feature_count
+  validation_or_test_used_for_selection: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_input_data_used: false
+  pretrained_model_used: true
+  hosted_api_note: "각 nested OOF 후보 평가에서 선택된 대회 수치 피처와 fold-train 레이블이 Prior Labs API로 전송됨"
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_v3_011
+  secondary: selected_feature_count_stable_across_outer_folds
+  safety:
+    - feature_count_selected_inside_outer_fold_train_only
+    - no_outer_validation_labels_used_for_feature_count_selection
+    - no_test_statistics_used
+    - api_secret_not_logged_or_committed
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  pretrained_model_used: true
+  intended_change: nested_oof_tabpfn_adaptive_feature_count

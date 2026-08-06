@@ -18,9 +18,34 @@ from src.models import MODEL_BUILDERS
 from src.pipelines.preprocessing_registry import create_preprocessing_pipeline
 
 
-def load_config(path: Path) -> dict:
+def _deep_merge_config(base: dict, override: dict) -> dict:
+    """중첩 설정을 복사한 뒤 variant에서 지정한 값만 재귀적으로 덮어씁니다."""
+    merged = deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_config(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
+
+
+def load_config(path: Path, _visited: set[Path] | None = None) -> dict:
+    """YAML을 읽고 선택적 extends 체인을 순환 없이 병합합니다."""
+    resolved = path.resolve()
+    visited = set() if _visited is None else set(_visited)
+    if resolved in visited:
+        chain = " -> ".join(str(item) for item in (*visited, resolved))
+        raise ValueError(f"설정 extends 순환이 감지됐습니다: {chain}")
+    visited.add(resolved)
     with path.open(encoding="utf-8") as file:
-        return yaml.safe_load(file)
+        config = yaml.safe_load(file) or {}
+    parent = config.pop("extends", None)
+    if parent is None:
+        return config
+    parent_path = Path(parent)
+    if not parent_path.is_absolute():
+        parent_path = path.parent / parent_path
+    return _deep_merge_config(load_config(parent_path, visited), config)
 
 
 def build_model(config: dict, class_names=None):

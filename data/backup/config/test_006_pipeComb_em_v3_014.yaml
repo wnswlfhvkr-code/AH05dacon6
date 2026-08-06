@@ -1,0 +1,121 @@
+extends: test_006_pipeComb_em_v3_011.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_014
+  description: "v3_011 성능 저하 대응: TabPFN 안정 피처 256개 제한 + 비기여 TabPFN/base 제거 허용 + 강한 base/meta 규제"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  require_tabpfn: false
+  minimum_selected_models: 2
+  subset_selection_folds: 5
+  subset_score_tolerance: 0.0015
+  tabpfn:
+    max_features: 256
+    selector_mode: stable_anova
+    minimum_nonzero_support: 10
+    maximum_nonzero_prevalence: 0.95
+    minimum_variance: 1.0e-8
+    stability_folds: 3
+    stability_top_multiplier: 2.0
+    minimum_selection_frequency: 2
+    n_estimators: 4
+    temperature: 1.15
+  text_linear_svc:
+    C: 0.055
+    class_weight: balanced
+    max_iter: 20000
+    tol: 0.0001
+    dual: auto
+  emv46_xgboost:
+    n_estimators: 420
+    learning_rate: 0.020
+    max_depth: 2
+    min_child_weight: 12.0
+    subsample: 0.68
+    colsample_bytree: 0.45
+    reg_alpha: 2.5
+    reg_lambda: 22.0
+    early_stopping_rounds: 35
+  emv46_lightgbm:
+    n_estimators: 360
+    learning_rate: 0.020
+    num_leaves: 7
+    max_depth: 3
+    min_child_samples: 60
+    subsample: 0.68
+    subsample_freq: 1
+    colsample_bytree: 0.45
+    reg_alpha: 3.0
+    reg_lambda: 24.0
+    early_stopping_rounds: 35
+  meta_learner:
+    C: 0.008
+    solver: saga
+    l1_ratio: 0.15
+    class_weight: balanced
+    max_iter: 5000
+    tol: 0.0001
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_011
+  validation_macro_f1: 0.570758
+  train_macro_f1: 0.808047
+  overfit_gap: 0.237289
+  comparison_to_v3_008:
+    validation_macro_f1_change: -0.005153
+    overfit_gap_change: 0.002793
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_011
+  tabpfn_refinement:
+    previous_selector: top_512_anova
+    new_selector: support_prevalence_variance_filtered_stable_anova_top_256
+    noise_controls:
+      minimum_nonzero_support: 10
+      maximum_nonzero_prevalence: 0.95
+      minimum_variance: 1.0e-8
+      minimum_fold_selection_frequency: 2_of_3
+  subset_policy:
+    candidates: all_2_to_4_model_subsets
+    candidate_count: 11
+    tabpfn_may_be_removed_when_cross_fitted_oof_degrades: true
+    tie_break: fewer_models_within_0.0015
+  regularization:
+    linear_meta_note: max_depth_and_subsample_not_applicable
+    meta_control: stronger_elastic_net_l1_l2_with_lower_C
+    xgboost_control: shallower_depth_higher_child_weight_lower_subsample_stronger_l1_l2
+    lightgbm_control: fewer_leaves_shallower_depth_higher_child_samples_lower_subsample_stronger_l1_l2
+  selection_data: fold_train_oof_only
+  outer_validation_or_test_used_for_selection: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_input_data_used: false
+  pretrained_model_used: true
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.570758
+  preferred: validation_macro_f1_greater_or_equal_0.575911
+  secondary: overfit_gap_less_than_0.237289
+  safety:
+    - stable_feature_selection_fit_on_fold_train_only
+    - model_subset_selected_with_cross_fitted_oof_only
+    - tabpfn_fallback_exclusion_available
+    - no_validation_or_test_statistics_used
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  pretrained_model_used: true
+  intended_change: stable_tabpfn_feature_refinement_and_aggressive_regularization

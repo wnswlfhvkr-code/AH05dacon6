@@ -1,0 +1,55 @@
+extends: test_006_pipeComb_em_v4_009.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_011
+  description: "v4_009 row-subsampling에 fold-train EMV46 저빈도·완전 중복·고상관 제거를 결합"
+
+preprocessing:
+  correlation_filter_parameters:
+    enabled: true
+    correlation_method: pearson
+    correlation_threshold: 0.98
+    correlation_max_features: 5000
+    correlation_block_size: 256
+    min_active_count: 5
+    active_epsilon: 1.0e-8
+
+training:
+  target_validation_macro_f1_min: 0.565093
+  target_overfit_gap_max: 0.22
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_009
+  referenced_filter: test_006_pipeComb_em_v3_008
+  combined_changes:
+    - xgboost_and_lightgbm_row_subsample_0.65
+    - emv46_label_free_correlation_pruning
+  filter_scope: emv46_numeric_tree_view_only
+  filter_order:
+    - minimum_active_count
+    - exact_duplicate
+    - high_absolute_pearson_correlation
+  representative_priority:
+    - clinical_interpretability_proxy
+    - active_sample_support
+    - variance
+    - stable_original_column_order
+  optimization:
+    emv46_frame_generation_count: 1
+    correlation_matrix_mode: float32_blockwise
+    correlation_block_size: 256
+    jsj9_tfidf_recomputed_for_filter: false
+    jyp9_recomputed_for_filter: false
+    jh10_svd_recomputed_for_filter: false
+  label_used_for_selection: false
+  validation_and_test_policy: transform_only_with_train_selected_schema
+  preserve_original_subclass: true
+  external_data_used: false
+  test_fit_used: false
+
+record:
+  status: ready_to_run
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: combine_row_randomness_and_single_pass_emv46_correlation_pruning

@@ -1,0 +1,20 @@
+extends: test_006_pipeComb_em_v4_003.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_004
+  description: "SVD 64를 LightGBM에만 제공해 XGBoost와의 오차 상관을 낮추는 비대칭 tree-view 실험"
+
+preprocessing:
+  tree_view_parameters:
+    asymmetric_svd_routing: true
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_003
+  change_only: asymmetric_svd_tree_routing
+  unchanged_model_hyperparameters: false
+  combined_input: [text, xgboost_core_tree, lightgbm_core_plus_svd_tree]
+  xgboost_features: [EMV46, JYP9]
+  lightgbm_features: [EMV46, JYP9, JH10_SVD64]
+
+record:
+  intended_change: route_svd_only_to_lightgbm_without_duplicate_matrix_builds

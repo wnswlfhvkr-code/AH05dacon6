@@ -1,0 +1,40 @@
+extends: test_006_pipeComb_em_v4_003.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_005
+  description: "기존 세 모델을 유지하고 강하게 규제된 CatBoost를 네 번째 OOF 다양성 모델로 추가"
+
+model:
+  fourth_model: catboost
+  fourth_temperature: 1.25
+  emv46_catboost:
+    loss_function: MultiClass
+    eval_metric: MultiClass
+    iterations: 320
+    learning_rate: 0.020
+    depth: 4
+    l2_leaf_reg: 25.0
+    random_strength: 2.0
+    bootstrap_type: Bernoulli
+    subsample: 0.70
+    rsm: 0.40
+    thread_count: -1
+    verbose: false
+    allow_writing_files: false
+    early_stopping_rounds: 40
+  meta_learner:
+    C: 0.012
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_003
+  ensemble_model: [LinearSVC, XGBoost, LightGBM, CatBoost]
+  ensemble_method: four_model_single_level_oof_regularized_stacking
+  change_only: add_regularized_catboost_diversity_model
+  unchanged_model_hyperparameters: false
+  expected_base_model_fit_count: 48
+
+runtime_expectation:
+  relative_to_v4_003: approximately_1.25_to_1.45x
+
+record:
+  intended_change: add_catboost_as_fourth_cross_fitted_model

@@ -1,0 +1,97 @@
+extends: test_006_pipeComb_em_v3_008.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_012
+  description: "v4_011 성능 저하 대응: v3_008 전처리/base로 백트래킹하고 얕은 강규제 XGBoost meta만 차분 적용"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+preprocessing:
+  name: pipeComb_em_v3
+
+model:
+  name: pipecomb_oof_stacking
+  meta_learner:
+    type: xgboost
+    objective: multi:softprob
+    n_estimators: 120
+    learning_rate: 0.03
+    max_depth: 1
+    min_child_weight: 10.0
+    subsample: 0.70
+    colsample_bytree: 0.65
+    reg_alpha: 5.0
+    reg_lambda: 30.0
+    gamma: 0.10
+    max_delta_step: 1.0
+    eval_metric: mlogloss
+    tree_method: hist
+    n_jobs: -1
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  backtracking_target:
+    experiment: test_006_pipeComb_em_v3_008
+    validation_macro_f1: 0.575911
+    train_macro_f1: 0.810407
+    overfit_gap: 0.234496
+  comparison_source:
+    experiment: test_006_pipeComb_em_v4_011
+    validation_macro_f1: 0.569081
+    train_macro_f1: 0.797108
+    overfit_gap: 0.228028
+  v4_011_minus_v3_008:
+    validation_macro_f1: -0.006830
+    train_macro_f1: -0.013299
+    overfit_gap: -0.006468
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_008
+  backtracked_components:
+    - pipeComb_em_v3_feature_structure
+    - no_jh10_svd_features
+    - no_asymmetric_svd_tree_routing
+    - v3_008_text_linear_svc_parameters
+    - v3_008_xgboost_parameters
+    - v3_008_lightgbm_parameters
+    - v3_008_correlation_filter
+  isolated_change: logistic_meta_to_shallow_regularized_xgboost_meta
+  meta_complexity_controls:
+    max_depth: 1
+    subsample: 0.70
+    colsample_bytree: 0.65
+    reg_alpha: 5.0
+    reg_lambda: 30.0
+    min_child_weight: 10.0
+    gamma: 0.10
+  reason_for_single_delta: separate_meta_regularization_effect_from_v4_feature_changes
+  meta_training_input: base_model_fold_train_oof_probabilities_only
+  validation_or_test_used_for_meta_fit: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_or_equal_0.575911
+  secondary: overfit_gap_less_than_0.234496
+  reject_when:
+    - validation_macro_f1_less_than_0.569081
+    - meta_train_validation_gap_increases
+  safety:
+    - base_probabilities_are_oof
+    - preprocessing_fit_on_fold_train_only
+    - no_validation_or_test_statistics_used
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: v3_008_backtracking_with_shallow_regularized_xgboost_meta

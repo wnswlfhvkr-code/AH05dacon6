@@ -1,0 +1,56 @@
+extends: test_006_pipeComb_em_v4_002.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_010
+  description: "v4_002 규제 모델에 v3_008 방식의 fold-train EMV46 중복·고상관 제거를 추가"
+
+preprocessing:
+  correlation_filter_parameters:
+    enabled: true
+    correlation_method: pearson
+    correlation_threshold: 0.98
+    correlation_max_features: 5000
+    correlation_block_size: 256
+    min_active_count: 5
+    active_epsilon: 1.0e-8
+
+training:
+  target_validation_macro_f1_min: 0.563785
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v4_002
+  validation_macro_f1: 0.563785
+  train_macro_f1: 0.799615
+  overfit_gap: 0.235830
+  total_features: 262858
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_002
+  referenced_filter: test_006_pipeComb_em_v3_008
+  change_only: emv46_tree_fold_train_correlation_pruning
+  filter_scope: emv46_numeric_tree_view_only
+  filter_order:
+    - minimum_active_count
+    - exact_duplicate
+    - high_absolute_pearson_correlation
+  representative_priority:
+    - clinical_interpretability_proxy
+    - active_sample_support
+    - variance
+    - stable_original_column_order
+  label_used_for_selection: false
+  jsj9_tfidf_recomputed_for_filter: false
+  jyp9_features_recomputed_for_filter: false
+  jh10_svd_recomputed_for_filter: false
+  validation_and_test_policy: transform_only_with_train_selected_schema
+  preserve_original_subclass: true
+  external_data_used: false
+  test_fit_used: false
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: add_single_pass_label_free_emv46_correlation_pruning_to_v4_002

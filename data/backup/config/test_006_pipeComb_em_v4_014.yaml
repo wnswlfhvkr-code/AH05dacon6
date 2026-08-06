@@ -1,0 +1,102 @@
+extends: test_006_pipeComb_em_v4_011.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_014
+  description: "v4_011 클래스 불균형 대응: fold-train effective-number weighted loss + 보수적 OOF 확률 보정, 오버샘플링 제외"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  class_weight_mode: effective_number
+  effective_number_beta: 0.99
+  class_weight_clip: [0.85, 2.00]
+  base_sample_weight_enabled: true
+  postprocessing:
+    enabled: true
+    method: oof_class_prior_power
+    folds: 5
+    gamma_candidates: [-0.075, -0.05, 0.00, 0.05, 0.075]
+    temperature_candidates: [0.97, 1.00, 1.03]
+    minimum_oof_macro_f1_gain: 0.003
+
+training:
+  target_validation_macro_f1_min: 0.569081
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v4_011
+  validation_macro_f1: 0.569081
+  train_macro_f1: 0.797108
+  overfit_gap: 0.228028
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_011
+  unchanged_components:
+    - pipeComb_em_v4_preprocessing
+    - jh10_svd_64
+    - asymmetric_svd_tree_routing
+    - emv46_fold_train_correlation_filter
+    - v4_011_base_model_complexity
+  class_imbalance_strategy:
+    weighting:
+      method: effective_number_of_samples
+      beta: 0.99
+      normalized_mean_sample_weight: 1.0
+      clip: [0.85, 2.00]
+      reason_for_not_full_balanced: limit_rare_pattern_overemphasis
+      statistics_source: each_fold_train_labels_only
+    weighted_losses:
+      linear_svc: class_weight
+      xgboost: sample_weight_multiclass_logloss
+      lightgbm: sample_weight_multiclass_logloss
+      meta_logistic: class_weight
+    probability_calibration:
+      method: bounded_oof_class_prior_power_and_temperature
+      gamma_bounds: [-0.075, 0.075]
+      temperature_bounds: [0.97, 1.03]
+      minimum_required_oof_macro_f1_gain: 0.003
+      identity_fallback: true
+  excluded_methods:
+    focal_loss:
+      applied: false
+      reason: no_common_stable_focal_objective_for_linear_xgboost_lightgbm_stack
+    minority_batch_sampling:
+      applied: false
+      reason: current_estimators_do_not_use_neural_minibatch_training
+    random_oversampling:
+      applied: false
+      reason: duplicate_rare_mutation_patterns_can_raise_memorization_and_overfit
+  validation_policy:
+    metric: macro_f1
+    stratified_stacking_folds: 5
+    compare_per_class_f1: true
+    require_minority_gain_across_multiple_folds: true
+  class_weight_or_calibration_fit_scope: fold_train_only
+  validation_or_test_class_counts_used: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.569081
+  preferred: validation_macro_f1_greater_or_equal_0.575911
+  secondary: overfit_gap_less_than_0.228028
+  minority_safety:
+    - minority_class_macro_f1_gain_repeated_across_folds
+    - no_material_majority_class_f1_collapse
+    - no_single_class_prediction_volume_explosion
+  leakage_safety:
+    - class_weights_fit_on_fold_train_labels_only
+    - calibration_selected_with_cross_fitted_oof_only
+    - no_validation_or_test_statistics_used
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: v4_011_effective_number_weighted_losses_and_conservative_oof_calibration

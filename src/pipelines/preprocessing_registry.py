@@ -119,9 +119,11 @@ from src.pipelines.pipeline_em_v43 import EMV43PreprocessingPipeline
 from src.pipelines.pipeline_em_v44 import EMV44PreprocessingPipeline
 from src.pipelines.pipeline_em_v45 import EMV45PreprocessingPipeline
 from src.pipelines.pipeline_em_v46 import EMV46PreprocessingPipeline
+from src.pipelines.pipeline_em_v47 import EMV47PreprocessingPipeline
 from src.pipelines.pipeline_pipeComb_em_v1 import PipeCombEMV1PreprocessingPipeline
 from src.pipelines.pipeline_pipeComb_em_v2 import PipeCombEMV2PreprocessingPipeline
 from src.pipelines.pipeline_pipeComb_em_v3 import PipeCombEMV3PreprocessingPipeline
+from src.pipelines.pipeline_pipeComb_em_v4 import PipeCombEMV4PreprocessingPipeline
 from src.pipelines.pipeline_pipeComb_em_v2_001 import (
     PipeCombEMV2001PreprocessingPipeline,
 )
@@ -268,9 +270,11 @@ PIPELINES = {
     "em_v44": EMV44PreprocessingPipeline,
     "em_v45": EMV45PreprocessingPipeline,
     "em_v46": EMV46PreprocessingPipeline,
+    "em_v47": EMV47PreprocessingPipeline,
     "pipeComb_em_v1": PipeCombEMV1PreprocessingPipeline,
     "pipeComb_em_v2": PipeCombEMV2PreprocessingPipeline,
     "pipeComb_em_v3": PipeCombEMV3PreprocessingPipeline,
+    "pipeComb_em_v4": PipeCombEMV4PreprocessingPipeline,
     "pipeComb_em_v2_001": PipeCombEMV2001PreprocessingPipeline,
     "pipeComb_em_v1_001": PipeCombEMV1001PreprocessingPipeline,
     "pipeComb_em_v1_006": PipeCombEMV1006PreprocessingPipeline,

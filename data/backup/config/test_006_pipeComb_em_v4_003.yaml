@@ -1,0 +1,21 @@
+extends: test_006_pipeComb_em_v4_002.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_003
+  description: "SVD 64 축소와 분산 모델 규제를 결합한 v4 우선 후보"
+
+preprocessing:
+  jh10_parameters:
+    svd_components: 64
+    svd_n_iter: 5
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4
+  combined_from: [test_006_pipeComb_em_v4_001, test_006_pipeComb_em_v4_002]
+  change_only: [jh10_svd_dimension_reduction, distributed_model_regularization]
+  unchanged_model_hyperparameters: false
+  jh10_feature_count: 64
+  jh10_features_used: [word_tfidf_svd_64]
+
+record:
+  intended_change: combine_lower_svd_capacity_and_distributed_regularization

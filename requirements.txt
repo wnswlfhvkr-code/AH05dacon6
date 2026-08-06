@@ -32,3 +32,4 @@ h5py>=3.10
 torch>=2.5,<3
 torch-geometric==2.5.0
 tabpfn==8.0.3
+tabpfn-client>=0.2.0

@@ -1,8 +1,10 @@
-"""EMV46·JSJ9·JYP9을 중복 없이 통합한 독립형 pipeComb EM v3.
+"""EMV46·JSJ9·JYP9·JH10을 중복 없이 통합한 pipeComb EM v4.
 
 JYP9의 F0~F4는 EMV46/JSJ9과 표현이 겹치므로 다시 만들지 않습니다.
 고유한 F7 클래스쌍 대비와 F9 전역 아미노산 치환 조성만 트리 뷰에
 추가하며, F7은 EMV46이 이미 만든 변이 행렬을 재사용합니다.
+JH10은 중복 parser·F1 요약을 제거하고 JSJ9 word TF-IDF의 SVD 잠재 뷰만
+tree 모델에 제공합니다.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import re
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack
+from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import StratifiedKFold
 
@@ -1323,6 +1326,9 @@ class TextTreeFeatureBundle:
 
     text: csr_matrix
     tree: csr_matrix
+    xgboost_tree: csr_matrix | None = None
+    third_tree: csr_matrix | None = None
+    fourth_tree: csr_matrix | None = None
 
 
 def _jsj_mutation_type(value: str) -> str:
@@ -1896,8 +1902,8 @@ class _JYP9UniqueFeatureEngine:
         return self.f7_feature_count_ + self.f9_feature_count_
 
 
-class _FoldTrainCorrelationPruner:
-    """EMV46 수치 피처의 완전 중복·고상관 신호를 label-free로 제거합니다."""
+class _EMV46CorrelationPruner:
+    """이미 생성된 EMV46 수치 뷰에서 중복·고상관 피처만 한 번 제거합니다."""
 
     def __init__(
         self,
@@ -1908,7 +1914,6 @@ class _FoldTrainCorrelationPruner:
         correlation_block_size: int = 256,
         min_active_count: int = 5,
         active_epsilon: float = 1.0e-8,
-        excluded_feature_prefixes: list[str] | tuple[str, ...] | None = None,
         **_: object,
     ) -> None:
         self.enabled = bool(enabled)
@@ -1918,21 +1923,17 @@ class _FoldTrainCorrelationPruner:
         self.correlation_block_size = int(correlation_block_size)
         self.min_active_count = int(min_active_count)
         self.active_epsilon = float(active_epsilon)
-        self.excluded_feature_prefixes = tuple(
-            str(prefix).upper() for prefix in (excluded_feature_prefixes or ())
-        )
         if self.correlation_method != "pearson":
-            raise ValueError("v3_008 correlation_method는 pearson만 지원합니다.")
+            raise ValueError("v4_010 correlation_method는 pearson만 지원합니다.")
         if not 0.0 < self.correlation_threshold <= 1.0:
             raise ValueError("correlation_threshold는 0보다 크고 1 이하여야 합니다.")
         if self.correlation_max_features < 2 or self.correlation_block_size < 2:
-            raise ValueError("correlation 후보 수와 block 크기는 2 이상이어야 합니다.")
+            raise ValueError("상관 후보 수와 block 크기는 2 이상이어야 합니다.")
         if self.min_active_count < 1 or self.active_epsilon < 0:
             raise ValueError("min_active_count는 1 이상이고 epsilon은 음수가 아니어야 합니다.")
         self.input_columns_: list[str] = []
         self.kept_columns_: list[str] = []
         self.dropped_rare_: list[str] = []
-        self.dropped_excluded_: list[str] = []
         self.dropped_exact_duplicate_: list[str] = []
         self.dropped_high_correlation_: list[str] = []
         self.correlation_candidate_count_ = 0
@@ -1989,8 +1990,8 @@ class _FoldTrainCorrelationPruner:
     ) -> pd.DataFrame:
         buckets: dict[bytes, list[str]] = {}
         for column in frame.columns:
-            fingerprint = self._fingerprint(frame[column].to_numpy(copy=False))
-            buckets.setdefault(fingerprint, []).append(column)
+            key = self._fingerprint(frame[column].to_numpy(copy=False))
+            buckets.setdefault(key, []).append(column)
         dropped: list[str] = []
         for candidates in buckets.values():
             if len(candidates) < 2:
@@ -2016,8 +2017,9 @@ class _FoldTrainCorrelationPruner:
         frame: pd.DataFrame,
         priorities: dict[str, tuple[float, ...]],
     ) -> pd.DataFrame:
-        ranked = sorted(frame.columns, key=priorities.__getitem__, reverse=True)
-        candidates = ranked[: self.correlation_max_features]
+        candidates = sorted(
+            frame.columns, key=priorities.__getitem__, reverse=True
+        )[: self.correlation_max_features]
         self.correlation_candidate_count_ = len(candidates)
         if len(candidates) < 2:
             return frame
@@ -2025,48 +2027,39 @@ class _FoldTrainCorrelationPruner:
         values -= values.mean(axis=0, keepdims=True)
         scale = values.std(axis=0, ddof=1, keepdims=True)
         scale[scale <= self.active_epsilon] = 1.0
-        values /= scale
-        values = np.nan_to_num(values, copy=False)
+        values = np.nan_to_num(values / scale, copy=False)
         denominator = max(len(frame) - 1, 1)
-        width = len(candidates)
-        dropped_mask = np.zeros(width, dtype=bool)
+        dropped = np.zeros(len(candidates), dtype=bool)
         group_count = 0
-        for start in range(0, width, self.correlation_block_size):
-            stop = min(start + self.correlation_block_size, width)
+        for start in range(0, len(candidates), self.correlation_block_size):
+            stop = min(start + self.correlation_block_size, len(candidates))
             correlation = values[:, start:stop].T @ values / denominator
             for local_index in range(stop - start):
-                global_index = start + local_index
-                if dropped_mask[global_index]:
+                index = start + local_index
+                if dropped[index]:
                     continue
                 matches = np.flatnonzero(
                     (
-                        np.abs(correlation[local_index, global_index + 1 :])
+                        np.abs(correlation[local_index, index + 1 :])
                         >= self.correlation_threshold
                     )
-                    & ~dropped_mask[global_index + 1 :]
+                    & ~dropped[index + 1 :]
                 )
                 if len(matches):
                     group_count += 1
-                    dropped_mask[global_index + 1 + matches] = True
-
+                    dropped[index + 1 + matches] = True
         self.high_correlation_group_count_ = group_count
         self.dropped_high_correlation_ = [
-            column for column, dropped in zip(candidates, dropped_mask) if dropped
+            column for column, remove in zip(candidates, dropped) if remove
         ]
         return frame.drop(columns=self.dropped_high_correlation_)
 
-    def fit(self, frame: pd.DataFrame) -> "_FoldTrainCorrelationPruner":
+    def fit(self, frame: pd.DataFrame) -> "_EMV46CorrelationPruner":
         self.input_columns_ = frame.columns.tolist()
         if not self.enabled:
             self.kept_columns_ = self.input_columns_.copy()
             return self
         numeric = self._numeric(frame)
-        self.dropped_excluded_ = [
-            column
-            for column in numeric.columns
-            if str(column).upper().startswith(self.excluded_feature_prefixes)
-        ] if self.excluded_feature_prefixes else []
-        numeric = numeric.drop(columns=self.dropped_excluded_)
         active = numeric.abs().gt(self.active_epsilon).sum(axis=0)
         self.dropped_rare_ = active[active < self.min_active_count].index.tolist()
         numeric = numeric.drop(columns=self.dropped_rare_)
@@ -2093,7 +2086,6 @@ class _FoldTrainCorrelationPruner:
         return {
             "correlation_filter_enabled": int(self.enabled),
             "correlation_input_features": len(self.input_columns_),
-            "dropped_explicit_risk_features": len(self.dropped_excluded_),
             "dropped_correlation_rare_features": len(self.dropped_rare_),
             "dropped_exact_duplicate_features": len(self.dropped_exact_duplicate_),
             "dropped_high_correlation_features": len(self.dropped_high_correlation_),
@@ -2102,10 +2094,75 @@ class _FoldTrainCorrelationPruner:
         }
 
 
-class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
-    """EMV46 tree·JSJ9 text·JYP9 고유 tree 피처를 반환합니다."""
+class _JH10LatentSVDEngine:
+    """JSJ9 word TF-IDF를 재사용해 JH10의 SVD 잠재 피처만 생성합니다."""
 
-    name = "pipeComb_em_v3"
+    def __init__(
+        self,
+        svd_components: int = 128,
+        svd_n_iter: int = 7,
+        svd_random_state: int = 42,
+        **_: object,
+    ) -> None:
+        if svd_components < 1 or svd_n_iter < 1:
+            raise ValueError("JH10 SVD components와 n_iter는 1 이상이어야 합니다.")
+        self.svd_components = int(svd_components)
+        self.svd_n_iter = int(svd_n_iter)
+        self.svd_random_state = int(svd_random_state)
+        self.svd = TruncatedSVD(
+            n_components=self.svd_components,
+            algorithm="randomized",
+            n_iter=self.svd_n_iter,
+            random_state=self.svd_random_state,
+        )
+        self.word_feature_count_ = 0
+
+    def _word_view(self, text: csr_matrix, word_feature_count: int) -> csr_matrix:
+        if word_feature_count < 1 or word_feature_count > text.shape[1]:
+            raise ValueError("JH10 word TF-IDF 피처 경계가 잘못되었습니다.")
+        return text[:, :word_feature_count].tocsr()
+
+    def fit(self, text: csr_matrix, word_feature_count: int) -> "_JH10LatentSVDEngine":
+        word = self._word_view(text, word_feature_count)
+        if word.shape[1] <= self.svd_components:
+            raise ValueError(
+                f"JH10 word 피처 {word.shape[1]}개는 "
+                f"SVD components={self.svd_components}보다 많아야 합니다."
+            )
+        self.word_feature_count_ = int(word_feature_count)
+        self.svd.fit(word)
+        return self
+
+    def fit_transform(self, text: csr_matrix, word_feature_count: int) -> csr_matrix:
+        word = self._word_view(text, word_feature_count)
+        if word.shape[1] <= self.svd_components:
+            raise ValueError(
+                f"JH10 word 피처 {word.shape[1]}개는 "
+                f"SVD components={self.svd_components}보다 많아야 합니다."
+            )
+        self.word_feature_count_ = int(word_feature_count)
+        reduced = self.svd.fit_transform(word).astype("float32", copy=False)
+        return csr_matrix(reduced)
+
+    def transform(self, text: csr_matrix) -> csr_matrix:
+        if self.word_feature_count_ == 0:
+            raise RuntimeError("JH10 SVD를 fit한 뒤 transform해야 합니다.")
+        word = self._word_view(text, self.word_feature_count_)
+        return csr_matrix(self.svd.transform(word).astype("float32", copy=False))
+
+    def feature_count(self) -> int:
+        return self.svd_components if self.word_feature_count_ else 0
+
+    def explained_variance(self) -> float:
+        if not hasattr(self.svd, "explained_variance_ratio_"):
+            return 0.0
+        return float(self.svd.explained_variance_ratio_.sum())
+
+
+class PipeCombEMV4PreprocessingPipeline(PreprocessingPipeline):
+    """EMV46 tree·JSJ9 text·JYP9 고유 tree·JH10 SVD 뷰를 반환합니다."""
+
+    name = "pipeComb_em_v4"
     evaluation_folds = 1
 
     def __init__(
@@ -2113,25 +2170,38 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
         emv46_parameters: dict[str, object] | None = None,
         text_parameters: dict[str, object] | None = None,
         jyp9_parameters: dict[str, object] | None = None,
+        jh10_parameters: dict[str, object] | None = None,
+        tree_view_parameters: dict[str, object] | None = None,
         correlation_filter_parameters: dict[str, object] | None = None,
+        evaluation_folds: int = 1,
         **parameters: object,
     ) -> None:
         super().__init__()
+        if isinstance(evaluation_folds, bool) or int(evaluation_folds) < 1:
+            raise ValueError("evaluation_folds는 1 이상의 정수여야 합니다.")
+        self.evaluation_folds = int(evaluation_folds)
         em_config = dict(parameters)
         em_config.update(emv46_parameters or {})
         text_config = dict(parameters)
         text_config.update(text_parameters or {})
         jyp9_config = dict(parameters)
         jyp9_config.update(jyp9_parameters or {})
+        jh10_config = dict(jh10_parameters or {})
+        tree_view_config = dict(tree_view_parameters or {})
+        self.asymmetric_svd_routing = bool(
+            tree_view_config.get("asymmetric_svd_routing", False)
+        )
         self.emv46_pipeline = _IntegratedEMV46PreprocessingPipeline(**em_config)
         self.jsj9_text_engine = _JSJ9TextOnlyEngine(**text_config)
         self.jyp9_unique_engine = _JYP9UniqueFeatureEngine(**jyp9_config)
-        self.correlation_pruner = _FoldTrainCorrelationPruner(
+        self.jh10_svd_engine = _JH10LatentSVDEngine(**jh10_config)
+        self.correlation_pruner = _EMV46CorrelationPruner(
             **dict(correlation_filter_parameters or {})
         )
         self.emv46_feature_count_ = 0
         self.jsj9_text_feature_count_ = 0
         self.jyp9_unique_feature_count_ = 0
+        self.jh10_svd_feature_count_ = 0
         self.combined_feature_count_ = 0
         self.steps = (
             "내장 EMV46 수치 피처 1회 생성",
@@ -2140,8 +2210,14 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
             "JYP9 F0~F4 중복 블록 생성 제거",
             "EM46 변이 행렬을 재사용한 JYP9 F7 내부 OOF pair contrast",
             "JYP9 F9 fold-train support 선택·최대 380개 log1p count",
-            "선택적 EMV46 완전 중복·고상관 Pearson 제거",
-            "LinearSVC text·XGBoost/LightGBM tree 뷰 분리",
+            "선택적 EMV46 저빈도·완전 중복·고상관 Pearson 제거",
+            f"JSJ9 word TF-IDF를 재사용한 JH10 SVD {self.jh10_svd_engine.svd_components}차원",
+            "JH10 중복 parser·TF-IDF·F1 요약 생성 제거",
+            (
+                "LinearSVC text·XGBoost core·LightGBM core+SVD 비대칭 뷰"
+                if self.asymmetric_svd_routing
+                else "LinearSVC text·XGBoost/LightGBM 공통 tree 뷰"
+            ),
             "단일 레벨 OOF stacking 입력 제공",
             "fold-train에서만 모든 상태 fit",
             "원본 SUBCLASS 유지",
@@ -2152,6 +2228,7 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
         emv46_count: int | None = None,
         text_count: int | None = None,
         jyp9_count: int | None = None,
+        jh10_count: int | None = None,
     ) -> None:
         if emv46_count is not None:
             self.emv46_feature_count_ = int(emv46_count)
@@ -2159,10 +2236,13 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
             self.jsj9_text_feature_count_ = int(text_count)
         if jyp9_count is not None:
             self.jyp9_unique_feature_count_ = int(jyp9_count)
+        if jh10_count is not None:
+            self.jh10_svd_feature_count_ = int(jh10_count)
         self.combined_feature_count_ = (
             self.emv46_feature_count_
             + self.jsj9_text_feature_count_
             + self.jyp9_unique_feature_count_
+            + self.jh10_svd_feature_count_
         )
 
     def _shared(self) -> _SharedMatrices:
@@ -2176,34 +2256,48 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
         emv46_features: pd.DataFrame,
         text_features: csr_matrix,
         jyp9_features: csr_matrix,
+        jh10_features: csr_matrix,
     ) -> TextTreeFeatureBundle:
         emv46_tree = csr_matrix(
             emv46_features.to_numpy(dtype="float32", copy=False)
         )
         jyp9_tree = jyp9_features.tocsr()
-        tree = hstack((emv46_tree, jyp9_tree), format="csr")
+        jh10_tree = jh10_features.tocsr()
+        core_tree = hstack((emv46_tree, jyp9_tree), format="csr")
+        tree = hstack((core_tree, jh10_tree), format="csr")
         text = text_features.tocsr()
         self._update_counts(
             emv46_tree.shape[1],
             text.shape[1],
             jyp9_tree.shape[1],
+            jh10_tree.shape[1],
         )
-        return TextTreeFeatureBundle(text=text, tree=tree)
+        return TextTreeFeatureBundle(
+            text=text,
+            tree=tree,
+            xgboost_tree=core_tree if self.asymmetric_svd_routing else tree,
+            third_tree=tree,
+            fourth_tree=tree,
+        )
 
     def fit(
         self,
         features: pd.DataFrame,
         labels: pd.Series,
-    ) -> "PipeCombEMV3PreprocessingPipeline":
+    ) -> "PipeCombEMV4PreprocessingPipeline":
         self.feature_columns = features.columns.tolist()
         self.emv46_pipeline.fit(features, labels)
         self.correlation_pruner.fit(self.emv46_pipeline.transform(features))
-        self.jsj9_text_engine.fit(features)
+        text = self.jsj9_text_engine.fit_transform(features)
         self.jyp9_unique_engine.fit(self._shared(), features, labels)
+        self.jh10_svd_engine.fit(
+            text, len(self.jsj9_text_engine.word_vectorizer.vocabulary_)
+        )
         self._update_counts(
             len(self.correlation_pruner.kept_columns_),
             self.jsj9_text_engine.feature_count(),
             self.jyp9_unique_engine.feature_count(),
+            self.jh10_svd_engine.feature_count(),
         )
         self.label_encoder.fit(labels)
         return self
@@ -2221,17 +2315,22 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
         jyp9 = self.jyp9_unique_engine.fit_transform(
             self._shared(), features, labels
         )
+        jh10 = self.jh10_svd_engine.fit_transform(
+            text, len(self.jsj9_text_engine.word_vectorizer.vocabulary_)
+        )
         self.label_encoder.fit(labels)
-        return self._bundle(emv46, text, jyp9)
+        return self._bundle(emv46, text, jyp9, jh10)
 
     def transform(self, features: pd.DataFrame) -> TextTreeFeatureBundle:
         emv46 = self.correlation_pruner.transform(
             self.emv46_pipeline.transform(features)
         )
+        text = self.jsj9_text_engine.transform(features)
         return self._bundle(
             emv46,
-            self.jsj9_text_engine.transform(features),
+            text,
             self.jyp9_unique_engine.transform(self._shared(), features),
+            self.jh10_svd_engine.transform(text),
         )
 
     def summary(self) -> dict[str, object]:
@@ -2240,6 +2339,12 @@ class PipeCombEMV3PreprocessingPipeline(PreprocessingPipeline):
             "emv46_features": self.emv46_feature_count_,
             "jsj9_text_features": self.jsj9_text_feature_count_,
             "jyp9_unique_features": self.jyp9_unique_feature_count_,
+            "jh10_svd_features": self.jh10_svd_feature_count_,
+            "jh10_svd_explained_variance": self.jh10_svd_engine.explained_variance(),
+            "asymmetric_svd_routing": int(self.asymmetric_svd_routing),
+            "jh10_reused_jsj9_word_tfidf": 1,
+            "jh10_duplicate_f1_features_skipped": 22,
+            "jh10_duplicate_parser_skipped": 1,
             "jyp9_f7_pair_contrast_features": self.jyp9_unique_engine.f7_feature_count_,
             "jyp9_f9_global_aa_pair_features": self.jyp9_unique_engine.f9_feature_count_,
             "jyp9_f9_min_transition_support": (

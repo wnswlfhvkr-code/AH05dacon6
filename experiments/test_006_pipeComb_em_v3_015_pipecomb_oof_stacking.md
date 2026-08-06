@@ -1,0 +1,199 @@
+# test_006_pipeComb_em_v3_015
+
+| 항목 | 결과 |
+| --- | --- |
+| 실행 시각 | 2026-08-06T12:24:01+09:00 |
+| 모델 | pipecomb_oof_stacking |
+| 전처리 파이프라인 | pipeComb_em_v3 |
+| 선택된 최소 변이 횟수 | - |
+| 학습 데이터 행 수 | 6201 |
+| 피처 수 | 197541 |
+| 최종 Macro F1 | 0.303724 |
+| 80% 학습 Macro F1 | 0.377915 |
+| 20% 검증 Macro F1 | 0.303724 |
+| 과적합 격차 | 0.074191 |
+| 과적합 여부 | False |
+| 설정 파일 | `configs/test_006_pipeComb_em_v3_015.yaml` |
+| 제출 파일 | `data/processed/test_006_pipeComb_em_v3_015_pipecomb_oof_stacking_submission.csv` |
+| 모델 아티팩트 | `models/test_006_pipeComb_em_v3_015.pkl` |
+
+## 하이퍼파라미터
+
+```yaml
+name: pipecomb_oof_stacking
+stacking_folds: 5
+class_weight_mode: sqrt_balanced
+class_weight_power: 0.35
+class_weight_clip:
+- 0.85
+- 1.8
+early_stopping_fraction: 0.15
+text_temperature: 1.2
+xgboost_temperature: 1.15
+lightgbm_temperature: 1.15
+text_linear_svc:
+  C: 0.07
+  class_weight: balanced
+  max_iter: 20000
+  tol: 0.0001
+  dual: auto
+emv46_xgboost:
+  objective: multi:softprob
+  n_estimators: 350
+  learning_rate: 0.025
+  max_depth: 3
+  min_child_weight: 8.0
+  subsample: 0.75
+  colsample_bytree: 0.55
+  reg_alpha: 1.5
+  reg_lambda: 15.0
+  max_delta_step: 1.0
+  eval_metric: mlogloss
+  tree_method: hist
+  n_jobs: -1
+  early_stopping_rounds: 30
+emv46_lightgbm:
+  objective: multiclass
+  n_estimators: 280
+  learning_rate: 0.025
+  num_leaves: 11
+  max_depth: 4
+  min_child_samples: 45
+  subsample: 0.75
+  subsample_freq: 1
+  colsample_bytree: 0.5
+  reg_alpha: 2.0
+  reg_lambda: 18.0
+  n_jobs: -1
+  verbosity: -1
+  early_stopping_rounds: 30
+meta_learner:
+  C: 0.02
+  solver: lbfgs
+  class_weight: balanced
+  max_iter: 3000
+  type: xgboost
+  objective: multi:softprob
+  n_estimators: 100
+  learning_rate: 0.025
+  max_depth: 1
+  min_child_weight: 15.0
+  subsample: 0.65
+  colsample_bytree: 0.55
+  reg_alpha: 7.0
+  reg_lambda: 40.0
+  gamma: 0.2
+  max_delta_step: 1.0
+  eval_metric: mlogloss
+  tree_method: hist
+  n_jobs: -1
+postprocessing:
+  enabled: false
+  method: oof_crossfit_classwise_threshold
+  folds: 5
+  gamma_candidates:
+  - -0.1
+  - -0.05
+  - 0.0
+  - 0.05
+  - 0.1
+  temperature_candidates:
+  - 0.95
+  - 1.0
+  - 1.05
+  minimum_oof_macro_f1_gain: 0.002
+  threshold_factor_candidates:
+  - 0.75
+  - 0.85
+  - 0.925
+  - 1.0
+  - 1.075
+  - 1.15
+  - 1.25
+  coordinate_descent_rounds: 2
+  threshold_log_l2: 0.002
+  minimum_class_support: 25
+meta_feature_selection:
+  enabled: true
+  max_features: 48
+  minimum_variance: 1.0e-06
+  stability_folds: 5
+  stability_top_multiplier: 1.5
+  minimum_selection_frequency: 3
+```
+
+## 전처리 설정
+
+```yaml
+name: pipeComb_em_v3
+text_parameters:
+  word_ngram_range:
+  - 1
+  - 2
+  word_min_df: 4
+  word_max_features: 160000
+  char_ngram_range:
+  - 3
+  - 5
+  char_min_df: 5
+  char_max_features: 100000
+  char_weight: 0.4
+  split_multi_event: false
+emv46_parameters:
+  min_mutation_count: 5
+  min_functional_mutation_count: 5
+  min_feature_support: 2
+  top_genes_per_class: 20
+  smoothing: 0.5
+  max_log2_odds: 8.0
+  shrinkage: 10.0
+  min_hotspot_count: 5
+  max_hotspots: 384
+  inner_signature_folds: 5
+  signature_temperature: 1.0
+  signature_random_state: 42
+  random_state: 42
+  feature_parameters:
+    F05:
+      min_hotspot_count: 5
+      max_hotspots: 384
+    F10:
+      min_feature_support: 2
+    F12:
+      min_hotspot_count: 5
+      max_hotspots: 384
+    F16:
+      top_genes_per_class: 20
+    F17:
+      top_genes_per_class: 20
+    F18:
+      top_genes_per_class: 20
+    F19:
+      top_genes_per_class: 20
+jyp9_parameters:
+  f7_pairs:
+  - - KIRC
+    - KIPAN
+  - - LGG
+    - GBMLGG
+  f7_top_k_per_direction: 3
+  f7_min_gene_support: 10
+  f7_laplace_alpha: 4.0
+  f7_burden_quantiles: 5
+  f7_stability_folds: 5
+  f7_min_direction_consistency: 4
+  f7_min_selection_frequency: 3
+  f7_oof_folds: 5
+  f7_random_state: 42
+  f9_min_transition_support: 5
+  f9_max_transitions: 128
+  f9_burden_normalize: true
+correlation_filter_parameters:
+  enabled: true
+  correlation_method: pearson
+  correlation_threshold: 0.97
+  correlation_max_features: 5000
+  correlation_block_size: 256
+  min_active_count: 10
+  active_epsilon: 1.0e-08
+```

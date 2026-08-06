@@ -1,0 +1,24 @@
+extends: test_006_pipeComb_em_v4.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_001
+  description: "v4의 JH10 SVD 잠재 차원을 128에서 64로 축소하는 단일요인 실험"
+
+preprocessing:
+  jh10_parameters:
+    svd_components: 64
+    svd_n_iter: 5
+
+training:
+  target_train_macro_f1_max: 0.80
+  target_validation_macro_f1_min: 0.570530
+  target_overfit_gap_max: 0.225
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4
+  change_only: jh10_svd_dimension_reduction
+  jh10_feature_count: 64
+  jh10_features_used: [word_tfidf_svd_64]
+
+record:
+  intended_change: reduce_dense_svd_capacity_without_model_change

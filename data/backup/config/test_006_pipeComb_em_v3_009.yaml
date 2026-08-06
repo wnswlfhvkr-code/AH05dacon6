@@ -1,0 +1,94 @@
+extends: test_006_pipeComb_em_v3_008.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_009
+  description: "v3_008에서 exact-pattern·중복 signature 피처를 제거하고 tree·meta 규제를 강화"
+
+model:
+  emv46_xgboost:
+    n_estimators: 450
+    learning_rate: 0.020
+    max_depth: 2
+    min_child_weight: 12.0
+    subsample: 0.72
+    colsample_bytree: 0.50
+    reg_alpha: 2.5
+    reg_lambda: 25.0
+    early_stopping_rounds: 40
+  emv46_lightgbm:
+    n_estimators: 350
+    learning_rate: 0.020
+    num_leaves: 7
+    max_depth: 3
+    min_child_samples: 65
+    subsample: 0.70
+    colsample_bytree: 0.45
+    reg_alpha: 3.0
+    reg_lambda: 25.0
+    early_stopping_rounds: 40
+  meta_learner:
+    C: 0.015
+
+preprocessing:
+  correlation_filter_parameters:
+    excluded_feature_prefixes:
+      - signature_all_
+      - signature_functional_
+      - pattern_label_
+
+training:
+  target_train_macro_f1_range: [0.77, 0.79]
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.22
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_008
+  validation_macro_f1: 0.575911
+  train_macro_f1: 0.810407
+  overfit_gap: 0.234496
+  total_features: 258591
+  emv46_input_features: 23059
+  emv46_remaining_features: 18920
+  removed_low_frequency: 2972
+  removed_exact_duplicate: 1123
+  removed_high_correlation: 44
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_008
+  improvements:
+    - remove_exact_pattern_label_statistics
+    - remove_duplicate_v45_signature_family
+    - strengthen_xgboost_capacity_regularization
+    - strengthen_lightgbm_capacity_regularization
+    - strengthen_meta_l2_regularization
+  removed_target_derived_prefixes:
+    - signature_all_
+    - signature_functional_
+    - pattern_label_
+  preserved_oof_signature_features: [F16, F17, F18, F19]
+  reason_for_partial_removal: retain_regularized_oof_class_signal_while_testing_duplicate_and_exact_pattern_risk
+  xgboost_changes:
+    max_depth: [3, 2]
+    learning_rate: [0.025, 0.020]
+    min_child_weight: [8.0, 12.0]
+    reg_alpha: [1.5, 2.5]
+    reg_lambda: [15.0, 25.0]
+  lightgbm_changes:
+    max_depth: [4, 3]
+    num_leaves: [11, 7]
+    min_child_samples: [45, 65]
+    reg_alpha: [2.0, 3.0]
+    reg_lambda: [18.0, 25.0]
+  meta_c: [0.020, 0.015]
+  feature_selection_fit_source: train_fold_only
+  validation_and_test_policy: transform_only_with_train_selected_schema
+  preserve_original_subclass: true
+  external_data_used: false
+  test_fit_used: false
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: remove_target_risk_duplicates_and_strengthen_tree_meta_regularization

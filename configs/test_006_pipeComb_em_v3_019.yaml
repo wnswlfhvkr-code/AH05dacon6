@@ -1,0 +1,110 @@
+extends: test_006_pipeComb_em_v3_008.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_019
+  description: "v3_008 구조 유지 + 완화된 minority batch sampling MLP meta learner로 클래스 불균형 처리"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  name: pipecomb_oof_stacking
+  meta_learner:
+    type: balanced_batch_mlp
+    hidden_dim: 48
+    dropout: 0.30
+    sampling_power: 0.50
+    sampling_weight_clip: [0.50, 3.00]
+    epoch_sample_multiplier: 1.00
+    label_smoothing: 0.02
+    learning_rate: 0.0007
+    weight_decay: 0.015
+    batch_size: 256
+    max_epochs: 300
+    patience: 30
+    validation_fraction: 0.15
+    gradient_clip_norm: 1.0
+    minimum_macro_f1_delta: 0.0001
+    device: cpu
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_008
+  validation_macro_f1: 0.575911
+  train_macro_f1: 0.810407
+  overfit_gap: 0.234496
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_008
+  isolated_change: logistic_meta_to_minority_batch_sampling_mlp_meta
+  unchanged_components:
+    - pipeComb_em_v3_preprocessing
+    - emv46_fold_train_correlation_filter
+    - jsj9_word_char_tfidf
+    - jyp9_f7_f9_features
+    - linear_svc_base_model
+    - xgboost_base_model
+    - lightgbm_base_model
+    - base_model_oof_generation
+  batch_sampling_design:
+    application_stage: stacking_meta_learner
+    input: base_model_oof_log_probabilities_entropy_and_margin
+    architecture: 84_to_48_to_26
+    sampler: weighted_random_sampler_with_replacement
+    class_weight_formula: balanced_weight_power_0.50
+    sampling_power: 0.50
+    sampling_weight_clip: [0.50, 3.00]
+    epoch_sample_multiplier: 1.00
+    reason_not_full_balance: limit_repetition_of_identical_rare_mutation_patterns
+    validation_distribution: original_stratified_distribution
+    early_stopping_metric: macro_f1
+  optimized_hyperparameters:
+    hidden_dim: 48
+    dropout: 0.30
+    label_smoothing: 0.02
+    optimizer: AdamW
+    learning_rate: 0.0007
+    weight_decay: 0.015
+    batch_size: 256
+    maximum_epochs: 300
+    early_stopping_patience: 30
+    gradient_clip_norm: 1.0
+  excluded_methods:
+    full_random_oversampling:
+      applied: false
+      reason: aggressive_equalization_can_memorize_rare_mutation_patterns
+    test_distribution_rebalancing:
+      applied: false
+      reason: data_leakage
+  sampling_weight_fit_scope: fold_train_oof_rows_only
+  meta_internal_validation_scope: fold_train_oof_rows_only
+  external_validation_or_test_used: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.575911
+  secondary: overfit_gap_less_than_0.234496
+  minority_safety:
+    - minority_class_f1_gain_across_multiple_classes
+    - no_majority_class_f1_collapse
+    - no_single_class_prediction_volume_explosion
+    - no_large_train_f1_jump_from_rare_pattern_memorization
+  training_safety:
+    - sampling_weights_fit_on_fold_train_labels_only
+    - natural_distribution_validation_for_early_stopping
+    - no_validation_or_test_statistics_used
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: v3_008_minority_batch_sampling_meta_learner
