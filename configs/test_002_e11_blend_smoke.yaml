@@ -1,0 +1,64 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_002_e11_blend_smoke
+  description: "E7 LR C=0.1과 TF-IDF LinearSVC C=0.2의 seed 42 cross-fit 결합"
+  task_type: crossfit_blend_smoke
+  parent_experiments:
+    - test_002_v08_overfit_grid_C_0p1
+    - test_002_e8_lsvc_grid_C_0p2
+
+data:
+  raw_dir: data/raw
+  train_file: train.csv
+  target_column: SUBCLASS
+  id_column: ID
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  processed_dir: data/processed/test_002_e11_blend_smoke
+
+inputs:
+  logistic_dir: data/processed/test_002_v08_overfit_grid/C_0p1
+  logistic_oof_file: oof_probability_by_seed.npy
+  logistic_seed_metrics_file: seed_oof_metrics.csv
+  logistic_class_order_file: class_order.csv
+
+  linear_svc_dir: data/processed/test_002_e8_lsvc_grid/C_0p2
+  linear_svc_oof_file: oof_decision_by_seed.npy
+  linear_svc_seed_metrics_file: seed_oof_metrics.csv
+  linear_svc_class_order_file: class_order.csv
+
+validation:
+  seed: 42
+  n_splits: 3
+  fold_column: fold_seed_42
+
+grid:
+  temperatures:
+    - 0.25
+    - 0.4
+    - 0.6
+    - 0.8
+    - 1.0
+    - 1.25
+    - 1.5
+    - 2.0
+  linear_svc_weights:
+    - 0.0
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5
+    - 0.6
+    - 0.7
+    - 0.8
+    - 0.9
+    - 1.0
+
+bootstrap:
+  iterations: 3000
+  random_state: 20260805
+
+selection:
+  minimum_oof_delta: 0.003
+  minimum_improved_fold_count: 2
+  require_bootstrap_ci_lower_ge_0: true

@@ -1,0 +1,89 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_002_v08_overfit
+  description: "E7(test_002_v08) Balanced Logistic Regression 과적합 진단"
+  seed: 42
+  python_version: "3.14"
+  task_type: overfit_diagnostic
+  parent_experiment: test_002_v08
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed/test_002_v08_overfit
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  wt_token: WT
+
+checks:
+  expected_train_rows: 6201
+  expected_test_rows: 2546
+  expected_gene_count: 4384
+  expected_class_count: 26
+  required_unique_id: true
+  required_same_gene_order: true
+
+validation:
+  strategy: fixed_stratified_group_class_burden
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  n_splits: 3
+  seeds:
+    - 42
+    - 2026
+    - 777
+  group: normalized_exact_mutation_profile
+  burden_bins:
+    boundaries:
+      - 0
+      - 6
+      - 10
+      - 17
+      - 34
+    labels:
+      - "0-5"
+      - "6-9"
+      - "10-16"
+      - "17-33"
+      - "34+"
+
+preprocessing:
+  name: jh_v08
+  parser_version: jh_parser_v1
+  f4_min_support: 5
+  features:
+    f0_gene_mutation_presence: true
+    f1_sample_summary: true
+    f2_gene_consequence: false
+    f3_global_amino_acid_position: true
+    f3_gene_aware_amino_acid_position: false
+    f4_exact_hotspot: true
+  f3_position_bins:
+    - "1-50"
+    - "51-100"
+    - "101-200"
+    - "201-400"
+    - "401-800"
+    - "801+"
+  f1_scaling: fold_local_standard_scaler
+
+model:
+  name: logistic_regression
+  C: 1.0
+  class_weight: balanced
+  solver: saga
+  penalty: l2
+  max_iter: 3000
+  tol: 0.0001
+  n_jobs: -1
+  seed_plus_fold: true
+
+training:
+  metric: macro_f1
+  diagnostic:
+    train_macro_f1: true
+    validation_macro_f1: true
+    generalization_gap: true
+    overfit_warning_threshold: 0.10
+  test_prediction: mean_probability_of_9_models

@@ -117,18 +117,66 @@ def create_wc_tfidf_lsvc_lgbm(model_config: dict, seed: int):
 
 def create_extra_trees(model_config: dict, seed: int):
     from src.models.extra_trees_model import create_model
+    
+    return create_model(model_config, seed)
+  
+  
+def create_muat(model_config: dict, seed: int):
+    from src.models.muat_model import create_model
 
     return create_model(model_config, seed)
 
 
 def create_balanced_random_forest(model_config: dict, seed: int):
     from src.models.balanced_random_forest_model import create_model
+    
+    return create_model(model_config, seed)
+  
+  
+def create_pair_specialist_classifier(model_config: dict, seed: int):
+    from src.models.pair_specialist_classifier_model import create_model
 
     return create_model(model_config, seed)
 
 
 def create_random_forest(model_config: dict, seed: int):
     from src.models.random_forest_model import create_model
+    
+    return create_model(model_config, seed)
+  
+  
+def create_pattern_posterior_classifier(model_config: dict, seed: int):
+    from src.models.pattern_posterior_classifier_model import create_model
+
+    return create_model(model_config, seed)
+
+
+def create_macro_f1_calibrated_classifier(model_config: dict, seed: int):
+    from src.models.macro_f1_calibrated_classifier_model import create_model
+
+    return create_model(model_config, seed)
+
+
+def create_tabpfn3(model_config: dict, seed: int):
+    from src.models.tabpfn3_model import create_model
+
+    return create_model(model_config, seed)
+
+
+def create_pipecomb_ensemble(model_config: dict, seed: int):
+    from src.models.pipecomb_ensemble_model import create_model
+
+    return create_model(model_config, seed)
+
+
+def create_pipecomb_weighted_soft_voting(model_config: dict, seed: int):
+    from src.models.pipecomb_weighted_soft_voting_model import create_model
+
+    return create_model(model_config, seed)
+
+
+def create_pipecomb_oof_stacking(model_config: dict, seed: int):
+    from src.models.pipecomb_oof_stacking_model import create_model
 
     return create_model(model_config, seed)
 
@@ -156,4 +204,12 @@ MODEL_BUILDERS = {
     "extra_trees": create_extra_trees,
     "balanced_random_forest": create_balanced_random_forest,
     "random_forest": create_random_forest,
+    "muat": create_muat,
+    "pair_specialist_classifier": create_pair_specialist_classifier,
+    "pattern_posterior_classifier": create_pattern_posterior_classifier,
+    "macro_f1_calibrated_classifier": create_macro_f1_calibrated_classifier,
+    "tabpfn3": create_tabpfn3,
+    "pipecomb_ensemble": create_pipecomb_ensemble,
+    "pipecomb_weighted_soft_voting": create_pipecomb_weighted_soft_voting,
+    "pipecomb_oof_stacking": create_pipecomb_oof_stacking,
 }

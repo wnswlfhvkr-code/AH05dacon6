@@ -11,12 +11,28 @@ from sklearn.model_selection import StratifiedKFold
 from src.pipelines.base import PreprocessingPipeline
 
 
+RAW_PATTERN_KEY_COLUMN = "__raw_mutation_pattern_key__"
+
+
+def create_raw_mutation_pattern_keys(features: pd.DataFrame) -> pd.Series:
+    """모든 원시 유전자 셀 값으로 표본별 안정적인 패턴 키를 만듭니다."""
+    if RAW_PATTERN_KEY_COLUMN in features.columns:
+        raise ValueError(f"예약된 피처 이름이 원본 데이터에 존재합니다: {RAW_PATTERN_KEY_COLUMN}")
+    normalized = features.astype("string").fillna("WT").apply(
+        lambda column: column.str.strip().str.upper()
+    )
+    hashes = pd.util.hash_pandas_object(normalized, index=False, categorize=True)
+    return hashes.map(lambda value: f"{int(value):016x}").rename(
+        RAW_PATTERN_KEY_COLUMN
+    )
+
+
 def create_mutation_presence_matrix(features: pd.DataFrame) -> pd.DataFrame:
-    """v12의 최소 빈도 계산을 위한 WT/변이 이진 행렬입니다."""
+    """결측·WT=0, 관찰된 변이=1인 이진 행렬을 만듭니다."""
     return pd.DataFrame(
         {
-            column: features[column].astype("string").str.strip().str.upper()
-            .ne("WT").fillna(False).astype("int8")
+            column: features[column].astype("string").fillna("WT")
+            .str.strip().str.upper().ne("WT").astype("int8")
             for column in features.columns
         },
         index=features.index,
@@ -53,8 +69,8 @@ def learn_recurrent_hotspots(
 
     support: Counter[tuple[str, str]] = Counter()
     for gene in columns:
-        normalized = features[gene].astype("string").str.strip().str.upper()
-        mutated = normalized[normalized.ne("WT").fillna(False)].dropna()
+        normalized = features[gene].astype("string").fillna("WT").str.strip().str.upper()
+        mutated = normalized[normalized.ne("WT")]
         for value in mutated:
             for token in set(str(value).split()):
                 support[(gene, token)] += 1
@@ -83,7 +99,7 @@ def create_hotspot_matrix(
     for gene, gene_hotspots in by_gene.items():
         if gene not in features.columns:
             raise ValueError(f"hotspot 생성에 필요한 유전자 컬럼이 없습니다: {gene}")
-        normalized = features[gene].astype("string").str.strip().str.upper()
+        normalized = features[gene].astype("string").fillna("WT").str.strip().str.upper()
         token_sets = normalized.map(
             lambda value: frozenset()
             if pd.isna(value) or value == "WT"
@@ -106,9 +122,9 @@ def create_consequence_severity_matrix(
         raise ValueError(f"결과 유형 생성에 필요한 피처가 없습니다: {sorted(missing_columns)}")
     severity_columns: dict[str, pd.Series] = {}
     for column in columns:
-        normalized = features[column].astype("string").str.strip().str.upper()
+        normalized = features[column].astype("string").fillna("WT").str.strip().str.upper()
         severity = pd.Series(0, index=features.index, dtype="int8")
-        severity.loc[normalized.ne("WT").fillna(False)] = 2
+        severity.loc[normalized.ne("WT")] = 2
         severity.loc[normalized.str.fullmatch(r"([A-Z])\d+\1", na=False)] = 1
         severity.loc[normalized.str.contains(r"DEL|INS|DUP|>", regex=True, na=False)] = 3
         severity.loc[normalized.str.contains(r"FS|\*|TER", regex=True, na=False)] = 4
@@ -273,6 +289,7 @@ class EMV16PreprocessingPipeline(PreprocessingPipeline):
         max_hotspots: int = 384,
         inner_signature_folds: int = 5,
         signature_random_state: int = 42,
+        include_raw_pattern_key: bool = False,
         **parameters: object,
     ) -> None:
         super().__init__(**parameters)
@@ -295,6 +312,7 @@ class EMV16PreprocessingPipeline(PreprocessingPipeline):
         self.max_hotspots = max_hotspots
         self.inner_signature_folds = inner_signature_folds
         self.signature_random_state = signature_random_state
+        self.include_raw_pattern_key = bool(include_raw_pattern_key)
         self.selected_gene_columns: list[str] = []
         self.dropped_rare_columns: list[str] = []
         self.mutation_counts_: dict[str, int] = {}
@@ -309,6 +327,8 @@ class EMV16PreprocessingPipeline(PreprocessingPipeline):
             "inner-fold OOF 암종 signature",
             "학습 Fold 반복 hotspot",
         )
+        if self.include_raw_pattern_key:
+            self.steps += ("원시 변이 패턴 키 전달",)
 
     def _build_features(self, features: pd.DataFrame) -> pd.DataFrame:
         severity = create_consequence_severity_matrix(features, self.selected_gene_columns)
@@ -387,10 +407,15 @@ class EMV16PreprocessingPipeline(PreprocessingPipeline):
         for column in oof_signatures:
             if column in transformed:
                 transformed.loc[:, column] = oof_signatures[column].to_numpy()
-        return transformed.astype("float32")
+        return transformed
 
     def transform(self, features: pd.DataFrame) -> pd.DataFrame:
-        return super().transform(self._build_features(features)).astype("float32")
+        transformed = super().transform(self._build_features(features)).astype("float32")
+        if self.include_raw_pattern_key:
+            transformed[RAW_PATTERN_KEY_COLUMN] = create_raw_mutation_pattern_keys(
+                features
+            )
+        return transformed
 
     def summary(self) -> dict[str, int]:
         summary = super().summary()
@@ -400,5 +425,6 @@ class EMV16PreprocessingPipeline(PreprocessingPipeline):
             "signature_features": (3 if self.include_signature_rate else 2)
             * len(self.class_names),
             "hotspot_features": len(self.hotspots_),
+            "raw_pattern_key_features": int(self.include_raw_pattern_key),
         })
         return summary

@@ -72,8 +72,36 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
     with config_path.open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
+    pipeline_name = config["preprocessing"]["name"]
+    assert pipeline_name in PIPELINES
+    pipeline_module = PIPELINES[pipeline_name].__module__
+    module_spec = importlib.util.find_spec(pipeline_module)
+    assert module_spec is not None
+    assert module_spec.origin is not None
+    assert Path(module_spec.origin).is_file()
+    if config_path.name == "test_006.yaml":
+        assert config["project"]["experiment_name"].startswith("test_006")
+        assert (ROOT / "src" / "ensembles").is_dir()
+        return
+
     if config_path.parent.name == "ensembles":
         experiment_name = config["project"]["experiment_name"]
+        test_008_runners = {
+            "test_008_v01": "train_jh_e8b.py",
+            "test_008_v02": "train_jh_e8c.py",
+            "test_008_v03": "train_jh_e10.py",
+            "test_008_v04": "train_jh_e10a.py",
+            "test_008_v05": "train_jh_e10b1.py",
+        }
+        if experiment_name in test_008_runners:
+            assert (
+                ROOT
+                / "src"
+                / "ensembles"
+                / test_008_runners[experiment_name]
+            ).is_file()
+            return
+
         suffix = experiment_name.removeprefix("test_002_")
         assert (ROOT / "src" / "ensembles" / f"train_jh_{suffix}.py").is_file()
         return
@@ -104,6 +132,11 @@ def test_config_uses_registered_pipeline(config_path: Path) -> None:
         pipeline_path = Path(module_spec.origin).resolve()
         assert pipeline_path.is_file()
         assert pipeline_path.is_relative_to((ROOT / "src" / "pipelines").resolve())
+
+
+def test_shared_sgkf_runner_uses_team_filename() -> None:
+    assert (ROOT / "src" / "train_sgkf.py").is_file()
+    assert not (ROOT / "src" / "train_jh_sgkf.py").exists()
 
 
 def test_test_005_config_matches_selected_em_v30_e4_condition() -> None:

@@ -9,6 +9,7 @@ from scipy.sparse import csr_matrix
 import yaml
 
 from src.models import MODEL_BUILDERS
+from src.models.tabpfn3_model import TabPFN3Classifier
 from src.pipelines.pipeline_jsj_v1 import (
     JSJV1PreprocessingPipeline,
     TextTreeFeatureBundle,
@@ -41,6 +42,10 @@ def test_new_models_and_pipeline_are_registered() -> None:
         "extra_trees",
         "balanced_random_forest",
         "random_forest",
+        "oncobert",
+        "muat",
+        "mutation_projector",
+        "tabpfn3",
     } <= set(MODEL_BUILDERS)
     assert {"jsj_v1", "jsj_v2"} <= set(PIPELINES)
 
@@ -51,6 +56,57 @@ def test_jsj_test_config_references_registered_components() -> None:
         config = yaml.safe_load(file)
     assert config["model"]["name"] in MODEL_BUILDERS
     assert config["preprocessing"]["name"] in PIPELINES
+
+
+def test_tabpfn3_config_references_registered_components() -> None:
+    root = Path(__file__).parents[1]
+    with (root / "configs" / "test_006_m9.yaml").open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+    assert config["model"]["name"] == "tabpfn3"
+    assert config["model"]["name"] in MODEL_BUILDERS
+    assert config["model"]["model_version"] == "v3"
+    assert config["preprocessing"]["name"] in PIPELINES
+
+
+def test_tabpfn3_reduces_features_inside_model_fit(monkeypatch) -> None:
+    class FakeTabPFN:
+        def fit(self, features, labels):
+            self.fit_shape = features.shape
+            self.classes_ = np.unique(labels)
+            return self
+
+        def predict(self, features):
+            return np.repeat(self.classes_[0], len(features))
+
+        def predict_proba(self, features):
+            return np.full(
+                (len(features), len(self.classes_)),
+                1.0 / len(self.classes_),
+            )
+
+    features = pd.DataFrame(
+        {
+            "TP53": [1, 1, 0, 0, 1, 0],
+            "BRAF": [0, 0, 1, 1, 0, 1],
+            "EGFR": [0, 1, 0, 1, 0, 1],
+            "KRAS": [1, 0, 1, 0, 1, 0],
+        },
+        dtype="float32",
+    )
+    labels = np.asarray([0, 0, 1, 1, 2, 2])
+    fake = FakeTabPFN()
+    model = TabPFN3Classifier(
+        {"reduction_method": "chi2", "max_features": 2},
+        seed=42,
+    )
+    monkeypatch.setattr(model, "_create_tabpfn", lambda: fake)
+
+    model.fit(features, labels)
+
+    assert fake.fit_shape == (6, 2)
+    assert model.summary()["removed_features"] == 2
+    assert model.predict(features).shape == labels.shape
+    assert model.predict_proba(features).shape == (6, 3)
 
 
 def test_jsj_v2_pipeline_creates_compact_numeric_features() -> None:

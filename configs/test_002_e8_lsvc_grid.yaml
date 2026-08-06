@@ -1,0 +1,99 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_002_e8_lsvc_grid
+  description: "E11: E7에서 채택한 피처 + TF-IDF + Balanced LinearSVC vs E7 Logistic Regression C=0.1"
+  seed: 42
+  python_version: "3.14"
+  task_type: linear_svc_regularization_grid
+  parent_experiment: test_002_v08_overfit_grid_C_0p1
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed/test_002_e8_lsvc_grid
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+  wt_token: WT
+
+checks:
+  expected_train_rows: 6201
+  expected_test_rows: 2546
+  expected_gene_count: 4384
+  expected_class_count: 26
+  required_unique_id: true
+  required_same_gene_order: true
+
+validation:
+  strategy: fixed_stratified_group_class_burden
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
+  n_splits: 3
+  seeds:
+    - 42
+  group: normalized_exact_mutation_profile
+  burden_bins:
+    boundaries:
+      - 0
+      - 6
+      - 10
+      - 17
+      - 34
+    labels:
+      - "0-5"
+      - "6-9"
+      - "10-16"
+      - "17-33"
+      - "34+"
+
+reference:
+  name: E7_logistic_regression_C_0p1
+  seed: 42
+  oof_macro_f1: 0.448957
+
+preprocessing:
+  name: jh_v09
+  parser_version: jh_parser_v1
+  f4_min_support: 5
+  features:
+    f0_gene_mutation_presence: true
+    f1_sample_summary: true
+    f2_gene_consequence: false
+    f3_global_amino_acid_position: true
+    f3_gene_aware_amino_acid_position: false
+    f4_exact_hotspot: true
+  f3_position_bins:
+    - "1-50"
+    - "51-100"
+    - "101-200"
+    - "201-400"
+    - "401-800"
+    - "801+"
+  f1_scaling: fold_local_standard_scaler
+  tfidf_sublinear_tf: true
+  tfidf_norm: l2
+
+model:
+  name: linear_svc
+  class_weight: balanced
+  max_iter: 20000
+  tol: 0.0001
+  dual: auto
+  seed_plus_fold: true
+
+grid:
+  C_values:
+    - 0.2
+    - 0.1
+    - 0.05
+    - 0.02
+  reuse_completed: true
+
+training:
+  metric: macro_f1
+  diagnostic:
+    train_macro_f1: true
+    validation_macro_f1: true
+    generalization_gap: true
+    overfit_warning_threshold: 0.10
+  test_prediction: false

@@ -10,4 +10,7 @@ __all__ = [
     "train_jh_e8a",
     "train_jh_e8b",
     "train_jh_e8c",
+    "train_jh_e10",
+    "train_jh_e10a",
+    "train_jh_e10b1",
 ]

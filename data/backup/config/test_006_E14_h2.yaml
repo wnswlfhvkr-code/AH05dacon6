@@ -1,0 +1,65 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_006_E14
+  description: "EMV16 + E7 OOF 패턴 불확실성 + E3 multi-hit + E6 pair contrast"
+  seed: 42
+  python_version: "3.14"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: xgboost
+  objective: multi:softprob
+  n_estimators: 550
+  learning_rate: 0.025
+  max_depth: 3
+  min_child_weight: 5.0
+  subsample: 0.80
+  colsample_bytree: 0.65
+  reg_alpha: 1.0
+  reg_lambda: 10.0
+  early_stopping_rounds: 30
+  eval_metric: mlogloss
+  tree_method: hist
+  n_jobs: -1
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  overfit_threshold: 0.1
+
+preprocessing:
+  name: em_E14
+  min_mutation_count: 5
+  top_genes_per_class: 20
+  smoothing: 0.5
+  max_log2_odds: 8.0
+  shrinkage: 10.0
+  min_hotspot_count: 5
+  max_hotspots: 384
+  inner_signature_folds: 5
+  random_state: 42
+
+experiment_design:
+  components: [E7, E3, E6]
+  comparison_model: fixed_xgboost
+  validation: stratified_5fold_oof
+  fit_preprocessing_within_fold: true
+  preserve_original_subclass: true
+  external_data_used: false
+  test_fit_used: false
+

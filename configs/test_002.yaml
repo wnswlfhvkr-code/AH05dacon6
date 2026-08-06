@@ -1,12 +1,12 @@
 project:
   name: AH05dacon6
-  experiment_name: test_002_v09
+  experiment_name: test_002_v10
   seed: 42
   python_version: "3.14"
 
 data:
   raw_dir: data/raw
-  processed_dir: data/processed/test_002_v09
+  processed_dir: data/processed/test_002_v10
   train_file: train.csv
   test_file: test.csv
   submission_file: sample_submission.csv
@@ -23,7 +23,8 @@ checks:
   required_same_gene_order: true
 
 validation:
-  strategy: stratified_group_class_burden
+  strategy: fixed_stratified_group_class_burden
+  fixed_split_file: data/processed/fixed_stratified_group_cv_splits.csv
   n_splits: 3
   seeds:
     - 42
@@ -45,7 +46,7 @@ validation:
       - "34+"
 
 preprocessing:
-  name: jh_v09
+  name: jh_v10
   parser_version: jh_parser_v1
   f4_min_support: 5
   features:
@@ -65,15 +66,31 @@ preprocessing:
   f1_scaling: fold_local_standard_scaler
   tfidf_sublinear_tf: true
   tfidf_norm: l2
+  svd_components: 128
+  svd_n_iter: 7
+  svd_random_state: 42
 
 model:
-  name: linear_svc
-  C: 0.2
+  name: lightgbm
+  objective: multiclass
+  n_estimators: 1200
+  learning_rate: 0.025
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 18
+  subsample: 0.85
+  subsample_freq: 1
+  colsample_bytree: 0.8
+  reg_alpha: 0.1
+  reg_lambda: 0.5
   class_weight: balanced
-  max_iter: 20000
-  tol: 0.0001
-  dual: auto
+  n_jobs: -1
+  verbosity: -1
+  device_type: cpu
+  seed_plus_fold: false
+  early_stopping_rounds: 50
+  eval_metric: multi_logloss
 
 training:
   metric: macro_f1
-  test_prediction: mean_decision_score_of_9_models
+  test_prediction: mean_probability_of_9_models

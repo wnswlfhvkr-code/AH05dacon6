@@ -23,7 +23,7 @@ def load_config(path: Path) -> dict:
         return yaml.safe_load(file)
 
 
-def build_model(config: dict):
+def build_model(config: dict, class_names=None):
     """설정의 모델 이름에 맞는 생성 함수를 호출합니다."""
     model_name = config["model"]["name"]
     try:
@@ -31,7 +31,14 @@ def build_model(config: dict):
     except KeyError as error:
         available = ", ".join(sorted(MODEL_BUILDERS))
         raise ValueError(f"지원하지 않는 모델입니다: {model_name}. 사용 가능: {available}") from error
-    return builder(config["model"], config["project"]["seed"])
+    model_config = deepcopy(config["model"])
+    if class_names is not None and model_name in {
+        "pair_specialist_classifier",
+        "pipecomb_ensemble",
+        "pipecomb_weighted_soft_voting",
+    }:
+        model_config["class_names"] = [str(value) for value in class_names]
+    return builder(model_config, config["project"]["seed"])
 
 
 def fit_model(
@@ -65,14 +72,17 @@ def used_tree_count(model) -> int | None:
 
     try:
         parameters = model.get_params()
-    except AttributeError:
+    except (AttributeError, TypeError, ValueError):
         return None
+
     for key in ("n_estimators", "iterations"):
         value = parameters.get(key)
         if value is not None:
             return int(value)
-    return None
 
+    return None
+  
+  
 
 def evaluate_stratified_oof(
     config: dict,
@@ -83,7 +93,7 @@ def evaluate_stratified_oof(
     """파이프라인을 fold 안에서 다시 학습하는 Stratified OOF 평가입니다."""
     template_config, _ = split_preprocessing_config(preprocessing_config)
     template = create_preprocessing_pipeline(template_config)
-    folds = int(template.evaluation_folds)
+    folds = int(getattr(template, "evaluation_folds", 1))
     if folds < 2:
         return {}
 
@@ -118,7 +128,7 @@ def evaluate_stratified_oof(
         encoded_valid_x = preprocessor.transform(fold_valid_x)
         encoded_train_y = preprocessor.encode_labels(fold_train_y)
         encoded_valid_y = preprocessor.encode_labels(fold_valid_y)
-        model = build_model(config)
+        model = build_model(config, preprocessor.label_encoder.classes_)
         fit_model(
             model,
             encoded_train_x,
@@ -137,7 +147,9 @@ def evaluate_stratified_oof(
         )
         fold_train_scores.append(train_score)
         fold_scores.append(valid_score)
-        fold_tree_counts.append(used_tree_count(model))
+        tree_count = used_tree_count(model)
+        if tree_count is not None:
+            fold_tree_counts.append(tree_count)
         if fold_preprocessing_cv:
             fold_preprocessing_selections.append({
                 "fold": fold,
@@ -175,6 +187,7 @@ def split_preprocessing_config(config: dict) -> tuple[dict, dict]:
     tuning_keys = (
         "min_mutation_count_cv",
         "min_functional_mutation_count_cv",
+        "min_redundancy_support_cv",
     )
     pipeline_config = {
         key: value
@@ -202,6 +215,14 @@ def select_min_mutation_count(
         "em_v3": "min_mutation_count",
         "em_v19": "min_functional_mutation_count",
         "em_v20": "min_functional_mutation_count",
+        "em_G01": "min_active_count",
+        "em_H01": "min_mutation_count",
+        "em_H02": "min_mutation_count",
+        "em_H03": "min_mutation_count",
+        "em_H04": "min_mutation_count",
+        "em_H05": "min_mutation_count",
+        "em_H06": "min_mutation_count",
+        "em_H07": "min_mutation_count",
     }
     parameter_name = parameter_by_pipeline.get(pipeline_name)
     if parameter_name is None or not tuning_config.get("enabled", False):
@@ -245,7 +266,7 @@ def select_min_mutation_count(
             encoded_train_y = preprocessor.encode_labels(fold_train_y)
             encoded_valid_y = preprocessor.encode_labels(fold_valid_y)
 
-            model = build_model(config)
+            model = build_model(config, preprocessor.label_encoder.classes_)
             fit_model(
                 model,
                 encoded_train_x,
@@ -342,6 +363,7 @@ def main() -> None:
     args = parser.parse_args()
     config = load_config(args.config)
     experiment_name = config["project"]["experiment_name"]
+    model_name = config["model"]["name"]
     data_config = config["data"]
     raw_dir = Path(data_config["raw_dir"])
     output_dir = Path(data_config["processed_dir"])
@@ -383,7 +405,9 @@ def main() -> None:
     valid_x = validation_preprocessor.transform(valid_features)
     train_y = validation_preprocessor.encode_labels(train_labels)
     valid_y = validation_preprocessor.encode_labels(valid_labels)
-    validation_model = build_model(config)
+    validation_model = build_model(
+        config, validation_preprocessor.label_encoder.classes_
+    )
     fit_model(validation_model, train_x, train_y, valid_x, valid_y)
     train_predictions = validation_model.predict(train_x)
     validation_predictions = validation_model.predict(valid_x)
@@ -410,7 +434,9 @@ def main() -> None:
             final_model_config["model"]["n_estimators"] = int(
                 np.median(fold_tree_counts)
             )
-    final_model = build_model(final_model_config)
+    final_model = build_model(
+        final_model_config, preprocessor.label_encoder.classes_
+    )
     fit_model(final_model, encoded_features, preprocessor.encode_labels(labels))
     encoded_test = preprocessor.transform(test.drop(columns=[identifier]))
     encoded_predictions = final_model.predict(encoded_test)
@@ -418,7 +444,7 @@ def main() -> None:
 
     submission = pd.read_csv(raw_dir / data_config["submission_file"])
     submission[target] = predictions
-    submission_path = output_dir / f"{experiment_name}_submission.csv"
+    submission_path = output_dir / f"{experiment_name}_{model_name}_submission.csv"
     submission.to_csv(submission_path, index=False, encoding="utf-8-sig")
 
     artifact_path = Path("models") / f"{experiment_name}.pkl"
@@ -450,7 +476,7 @@ def main() -> None:
         json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     write_experiment_report(
-        Path("experiments") / f"{experiment_name}.md",
+        Path("experiments") / f"{experiment_name}_{model_name}.md",
         args.config,
         effective_config,
         train_rows=len(train),

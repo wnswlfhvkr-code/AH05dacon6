@@ -27,7 +27,7 @@ data:
 #   n_jobs: -1
 #   eval_metric: mlogloss
 #   tree_method: hist
-#   device: cuda
+
 
 # [E4 조건]
 model:
