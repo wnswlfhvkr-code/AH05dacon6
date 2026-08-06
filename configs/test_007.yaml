@@ -1,0 +1,42 @@
+# TEST_007 모델 사다리의 첫 후보: pipeComb_v3 + CatBoost GPU C1
+
+project:
+  name: AH05dacon6
+  experiment_name: test_007_catboost_c1
+  seed: 42
+  python_version: "3.14"
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: catboost
+  n_estimators: 500
+  learning_rate: 0.03
+  depth: 6
+  l2_leaf_reg: 10.0
+  random_strength: 1.0
+  bootstrap_type: Bayesian
+  bagging_temperature: 1.0
+  loss_function: MultiClass
+  eval_metric: MultiClass
+  auto_class_weights: Balanced
+  task_type: GPU
+  devices: "0"
+  thread_count: -1
+  verbose: false
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  overfit_threshold: 0.1
+
+preprocessing:
+  name: pipeComb_v3

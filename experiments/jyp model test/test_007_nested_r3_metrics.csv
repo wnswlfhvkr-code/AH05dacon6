@@ -1,0 +1,14 @@
+stage,role,metric,score,std,status,source
+original_nested,primary,mean_macro_f1,0.5009104946418675,,baseline,nested_train_only_oof
+r3,primary,mean_macro_f1,0.5012538919188699,0.001736908745128604,train_only_qualified,refined_cv_metrics.json
+r3,robustness_challenger,mean_macro_f1,0.5012290919710035,0.001431800291693128,rejected_repeated_burden_1_decline,refined_cv_metrics.json
+r3,specialization_challenger,mean_macro_f1,0.5011286738400953,0.002050342798215239,rejected_unstable_collision_direction,refined_cv_metrics.json
+r3,primary,inner_oof_mean,0.4906312565762445,,diagnostic,refined_selection_records.json
+r3,primary,outer_fold_macro_f1_mean,0.5001208173239056,,diagnostic,refined_cv_metrics.json
+r3,primary,inner_minus_outer_gap,-0.009489560747661056,,diagnostic,derived_from_nested_artifacts
+r3,primary,absolute_fold_gap_mean,0.015813338434057335,,diagnostic,derived_from_nested_artifacts
+r3,primary,public_leaderboard,0.3743927897,,rejected,user_provided
+jsj_vote_select_v1,team_baseline,public_leaderboard,0.4660597084,,reference,user_provided
+r3_vs_original_nested,primary,oof_delta,0.000343397277002333,,improved_train_only,derived
+r3_vs_jsj_vote_select_v1,primary,public_leaderboard_delta,-0.0916669187,,worse,derived
+r3_nested_to_public_lb,primary,transfer_delta,-0.1268611022188699,,failed_transfer,derived

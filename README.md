@@ -36,12 +36,18 @@ python -m src.train --config configs/baseline.yaml
 `src/models/__init__.py`의 `MODEL_BUILDERS`에 등록합니다. 팀원별 실험
 설정은 `configs/test_001.yaml`부터 `test_004.yaml`까지 분리하여 사용합니다.
 
-현재 등록된 모델은 `xgboost`, `lightgbm`, `linear_svc`,
-`wc_tfidf_lsvc_lgbm`입니다. 정세준 실험은 `test_004.yaml`에서 관리합니다.
+현재 등록된 모델은 `logistic_regression`, `xgboost`, `lightgbm`,
+`catboost`, `torch_linear`, `logistic_regression_gpu`, `torch_mlp`, `tabpfn`,
+`tabicl`, `tabicl_collision_expert`, `tabfm_collision_expert`, `linear_svc`,
+`wc_tfidf_lsvc_lgbm`입니다. 정세준 실험은
+`test_004.yaml`에서 관리합니다.
 
 모든 XGBoost 실행은 `device: cuda`를 명시하며, 중앙 모델 팩토리도 CUDA를
 기본값으로 사용합니다. CPU 실행이 꼭 필요한 예외만 설정에서 `device: cpu`로
 명시적으로 덮어씁니다.
+
+CatBoost는 `task_type: GPU`만 지원하며 CPU 설정은 실행 전에 거부합니다.
+학습 로그 디렉터리를 만들지 않도록 중앙 모델 팩토리에서 파일 기록도 끕니다.
 
 ```bash
 python -m src.train --config configs/test_004.yaml
@@ -106,6 +112,58 @@ v3 재현 설정은 `configs/test_003_pipecomb_v3.yaml`에 따로 보존합니�
 python -m src.train --config configs/test_003.yaml
 ```
 
+### TEST_007 모델 실험
+
+TEST_007 전용 OOF 생성, Nested 탐색, 진단, refinement, 최종화 실행기는
+`src/test_007/` 패키지에 모아 관리합니다. 공용 학습기·모델·전처리 코드는
+각각 `src/train.py`, `src/models/`, `src/pipelines/`에 그대로 유지합니다.
+
+핵심 실행 설정은 `configs/test_007.yaml` 하나입니다. 모델 비교·Nested 탐색용
+YAML은 `data/backup/yaml/`에 보관합니다. 전처리는 Public LB가 더 높았던 현재
+작업 트리의 `pipeComb_v3`로 고정합니다. 보관 후보는 다음과 같습니다.
+
+| 번호 | 후보      | 적용 구조                                      | 장치                  |
+| ---: | --------- | ---------------------------------------------- | --------------------- |
+|    1 | TabM      | 26-class global                                | GPU                   |
+|    2 | ModernNCA | 26-class global → collision expert            | GPU                   |
+|    3 | RealMLP   | 26-class global                                | GPU                   |
+|    4 | RealTabR  | XGBoost global → collision expert             | GPU base + CPU expert |
+|    5 | xRFM      | 26-class global                                | CPU                   |
+
+모든 SVD는 해당 학습 fold 내부에서만 학습합니다. 충돌 expert는 base top-1이
+`GBMLGG↔LGG` 또는 `KIPAN↔KIRC`인 행에서만 활성화하고, 두 클래스의 기존
+확률 질량 안에서만 재분배합니다. 이번 모델 작업 때문에 `pipeComb_v3`를
+추가 변경하지 않았고 `pipeComb_v3_2`도 필요하지 않았습니다.
+
+```bash
+python -m src.train --config data/backup/yaml/test_007_tabm_global_c1.yaml
+python -m src.train --config data/backup/yaml/test_007_modernnca_global_c1.yaml
+python -m src.train --config data/backup/yaml/test_007_modernnca_expert_c1.yaml
+python -m src.train --config data/backup/yaml/test_007_realmlp_global_c1.yaml
+python -m src.train --config data/backup/yaml/test_007_realtabr_expert_c1.yaml
+python -m src.train --config data/backup/yaml/test_007_xrfm_c1.yaml
+```
+
+결과는 각 설정의 `test_007_*_c1` 이름으로 `data/processed/`, `experiments/`,
+`models/`에 생성됩니다. 전체 비교와 채택 판단은 `experiments/jyp model
+test/test_007_candidate_comparison.md`에서 확인할 수 있습니다.
+이전에 실행한 XGBoost·LightGBM·TabPFN·TabICL·TabFM 등의 설정과 결과는
+비교 이력으로 그대로 보존합니다.
+
+#### 완전 Nested OOF와 r3 판정
+
+후보 모델을 동일 `pipeComb_v3`, 3 seeds × 5 outer folds에서 비교한 뒤
+outer-train의 inner OOF만으로 fold별 앙상블과 r3 암종쌍 보정을 선택했습니다.
+r3 주력은 Nested OOF `0.501254`였지만 Public LB는 `0.374393`으로,
+팀 기준 `JSJ_VoteSelect_v1.csv`의 `0.466060`보다 낮았습니다. r3는 실전 제출
+후보에서 제외하며, 리더보드 결과를 새 가중치 튜닝에 사용하지 않습니다.
+
+r3가 기존 동결 primary에서 바꾼 최종 라벨은 2,546행 중 3행뿐이므로 낮은
+리더보드 점수를 후처리만의 문제로 보지 않습니다. 전체 타임라인, 15개 fold의
+모델 구성, inner/outer gap, RealTabR 감사, 리더보드 판정은
+`experiments/test_007_nested_r3.md`에 기록했고 기계 판독용 지표는
+`experiments/test_007_nested_r3_metrics.csv`에 저장했습니다.
+
 ## TEST_004 제출 재현
 
 정세준의 제출 6건은 `configs/test_004_1.yaml`부터
@@ -128,11 +186,10 @@ python -m src.train --config configs/test_005.yaml
 
 `test_005.yaml`은 OOF와 80/20 검증에서 조기 종료를 적용하고, 전체 데이터 최종 학습에서는 fold별 최적 트리 수의 중앙값으로 모델을 다시 학습합니다.
 
-토큰 기반 `em_v17`은 다음 설정으로 실행하며, 결과는 `experiments/em_v17_token_feature_experiments.md`에 기록됩니다.
-
-```bash
-python -m src.train --config configs/test_007.yaml
-```
+토큰 기반 `em_v17`의 과거 결과는
+`experiments/em_v17_token_feature_experiments.md`에 보존합니다. 당시 결과에는
+`test_007` 출력명이 사용됐지만, 현재 `configs/test_007.yaml`은 모델 비교
+작업으로 재지정했습니다.
 
 동의 변이와 기능 변이를 분리하는 `em_v18`은 다음 설정으로 실행합니다.
 
