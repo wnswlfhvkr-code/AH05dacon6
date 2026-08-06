@@ -1,0 +1,12 @@
+{
+  "artifact": "models\\TEST_004\\vote_select_inputs.npz",
+  "sha256": "8b8f8e04effe38663f6c3461210d568a90b0b657234a969cba6e2471604e6f9e",
+  "train_rows": 6201,
+  "test_rows": 2546,
+  "class_count": 26,
+  "train_id_sha256": "be9f74f46f9c63e2c28c629a6966415019287a53825264f1b0e86492c09135f9",
+  "test_id_sha256": "7374f8bdb8139f6048d39ec41ea9f753bcf9aeb399bb58a03e321abe1e9125ea",
+  "external_data_used": false,
+  "test_labels_used": false,
+  "description": "Compact fold-safe OOF/test probability inputs for TEST_004_8 and TEST_004_9"
+}

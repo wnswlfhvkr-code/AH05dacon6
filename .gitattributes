@@ -3,3 +3,4 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
 *.ckpt filter=lfs diff=lfs merge=lfs -text
 *.onnx filter=lfs diff=lfs merge=lfs -text
+models/TEST_004/*.npz filter=lfs diff=lfs merge=lfs -text
