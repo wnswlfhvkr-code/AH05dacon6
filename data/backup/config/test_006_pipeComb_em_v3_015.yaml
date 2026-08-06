@@ -1,0 +1,116 @@
+extends: test_006_pipeComb_em_v3_012.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_015
+  description: "v3_012 노이즈 완화: 원본 고차원 피처 정제 + fold-local OOF 메타 변수 안정 선택 + 강규제 depth-1 XGBoost meta"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+preprocessing:
+  text_parameters:
+    word_min_df: 4
+    word_max_features: 160000
+    char_min_df: 5
+    char_max_features: 100000
+  correlation_filter_parameters:
+    enabled: true
+    correlation_method: pearson
+    correlation_threshold: 0.97
+    correlation_max_features: 5000
+    correlation_block_size: 256
+    min_active_count: 10
+    active_epsilon: 1.0e-8
+
+model:
+  meta_feature_selection:
+    enabled: true
+    max_features: 48
+    minimum_variance: 1.0e-6
+    stability_folds: 5
+    stability_top_multiplier: 1.5
+    minimum_selection_frequency: 3
+  meta_learner:
+    type: xgboost
+    objective: multi:softprob
+    n_estimators: 100
+    learning_rate: 0.025
+    max_depth: 1
+    min_child_weight: 15.0
+    subsample: 0.65
+    colsample_bytree: 0.55
+    reg_alpha: 7.0
+    reg_lambda: 40.0
+    gamma: 0.20
+    max_delta_step: 1.0
+    eval_metric: mlogloss
+    tree_method: hist
+    n_jobs: -1
+  postprocessing:
+    enabled: false
+
+training:
+  target_validation_macro_f1_min: 0.574778
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_012
+  validation_macro_f1: 0.574778
+  train_macro_f1: 0.810845
+  overfit_gap: 0.236067
+  comparison_to_v3_008:
+    validation_macro_f1_change: -0.001133
+    overfit_gap_change: 0.001571
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_012
+  removed_component:
+    name: crossfit_classwise_threshold_postprocessing
+    reason: v3_012_validation_and_gap_worse_than_v3_008
+  high_dimensional_noise_controls:
+    word_tfidf_min_df: 4
+    word_tfidf_max_features: 160000
+    char_tfidf_min_df: 5
+    char_tfidf_max_features: 100000
+    numeric_min_active_count: 10
+    numeric_correlation_threshold: 0.97
+  oof_meta_feature_selection:
+    input_features_before_selection: 84
+    maximum_selected_features: 48
+    method: variance_then_fold_stable_anova
+    minimum_selection_frequency: 3_of_5
+    selection_inside_each_crossfit_train_fold: true
+  meta_complexity_controls:
+    model: xgboost
+    max_depth: 1
+    subsample: 0.65
+    colsample_bytree: 0.55
+    reg_alpha: 7.0
+    reg_lambda: 40.0
+    min_child_weight: 15.0
+    gamma: 0.20
+  selection_data: fold_train_oof_only
+  validation_or_test_used_for_selection: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.574778
+  preferred: validation_macro_f1_greater_or_equal_0.575911
+  secondary: overfit_gap_less_than_0.236067
+  safety:
+    - meta_feature_selection_refit_inside_crossfit_train_rows
+    - final_meta_selector_fit_on_training_oof_only
+    - no_validation_or_test_statistics_used
+    - identity_postprocessing_only
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: high_dimensional_and_oof_meta_noise_selection_with_strong_xgb_meta

@@ -1,0 +1,111 @@
+extends: test_006_pipeComb_em_v4_011.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_013
+  description: "v4_011 + 안정 피처 API TabPFN, fold-train OOF로 기존 base learner 최적 부분집합 선택"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  name: pipecomb_tabpfn_subset_stacking
+  stacking_folds: 5
+  require_tabpfn: true
+  minimum_selected_models: 1
+  subset_selection_folds: 5
+  subset_score_tolerance: 0.0015
+  reuse_fit_oof_probabilities: true
+  tabpfn:
+    api_key_name: tabpfn_api_key
+    env_file: .env
+    model_path: auto
+    max_features: 256
+    selector_mode: stable_anova
+    minimum_nonzero_support: 10
+    maximum_nonzero_prevalence: 0.95
+    minimum_variance: 1.0e-8
+    stability_folds: 3
+    stability_top_multiplier: 2.0
+    minimum_selection_frequency: 2
+    n_estimators: 4
+    softmax_temperature: 1.0
+    temperature: 1.15
+    balance_probabilities: false
+    ignore_pretraining_limits: false
+    thinking_mode: false
+  meta_learner:
+    type: logistic_regression
+    C: 0.012
+    solver: lbfgs
+    class_weight: balanced
+    max_iter: 3000
+
+training:
+  target_validation_macro_f1_min: 0.569081
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v4_011
+  validation_macro_f1: 0.569081
+  train_macro_f1: 0.797108
+  overfit_gap: 0.228028
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4_011
+  unchanged_components:
+    - pipeComb_em_v4_preprocessing
+    - jh10_svd_64
+    - asymmetric_svd_tree_routing
+    - emv46_fold_train_correlation_filter
+    - v4_011_text_xgboost_lightgbm_parameters
+  added_model: prior_labs_api_tabpfn
+  tabpfn_input_view: v4_xgboost_numeric_tree_view
+  tabpfn_feature_refinement:
+    selector: support_prevalence_variance_filtered_stable_anova
+    maximum_features: 256
+    minimum_nonzero_support: 10
+    maximum_nonzero_prevalence: 0.95
+    minimum_stability: 2_of_3_folds
+  candidate_policy:
+    required_model: tabpfn
+    optional_existing_models: [text, xgboost, lightgbm]
+    candidates:
+      - [tabpfn]
+      - [text, tabpfn]
+      - [xgboost, tabpfn]
+      - [lightgbm, tabpfn]
+      - [text, xgboost, tabpfn]
+      - [text, lightgbm, tabpfn]
+      - [xgboost, lightgbm, tabpfn]
+      - [text, xgboost, lightgbm, tabpfn]
+    selection_metric: separately_cross_fitted_macro_f1
+    tie_break: fewer_models_within_0.0015
+    remove_existing_model_when_oof_degrades: true
+  selection_scope: fold_train_only
+  validation_or_test_used_for_selection: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_input_data_used: false
+  pretrained_model_used: true
+  hosted_api_note: "선택된 대회 수치 피처와 fold-train 레이블이 Prior Labs API로 전송됨"
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.569081
+  preferred: validation_macro_f1_greater_or_equal_0.575911
+  secondary: overfit_gap_less_than_0.228028
+  safety:
+    - tabpfn_feature_selection_fit_on_fold_train_only
+    - existing_model_subset_selected_with_cross_fitted_oof_only
+    - no_validation_or_test_statistics_used
+    - api_secret_not_logged_or_committed
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  pretrained_model_used: true
+  intended_change: v4_011_api_tabpfn_with_oof_existing_model_subset_removal

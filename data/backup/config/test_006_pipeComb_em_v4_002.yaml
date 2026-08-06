@@ -1,0 +1,48 @@
+extends: test_006_pipeComb_em_v4.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_002
+  description: "SVD 128을 유지하고 LinearSVC·XGBoost·LightGBM·Meta 규제를 분산 강화"
+
+model:
+  class_weight_power: 0.30
+  class_weight_clip: [0.90, 1.70]
+  text_temperature: 1.25
+  xgboost_temperature: 1.20
+  lightgbm_temperature: 1.20
+  text_linear_svc:
+    C: 0.06
+  emv46_xgboost:
+    n_estimators: 400
+    learning_rate: 0.020
+    min_child_weight: 10.0
+    subsample: 0.72
+    colsample_bytree: 0.50
+    reg_alpha: 2.0
+    reg_lambda: 20.0
+    early_stopping_rounds: 40
+  emv46_lightgbm:
+    n_estimators: 320
+    learning_rate: 0.020
+    num_leaves: 9
+    min_child_samples: 55
+    subsample: 0.72
+    colsample_bytree: 0.45
+    reg_alpha: 2.5
+    reg_lambda: 22.0
+    early_stopping_rounds: 40
+  meta_learner:
+    C: 0.018
+
+training:
+  target_train_macro_f1_max: 0.80
+  target_validation_macro_f1_min: 0.570530
+  target_overfit_gap_max: 0.225
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v4
+  change_only: distributed_model_regularization
+  unchanged_model_hyperparameters: false
+
+record:
+  intended_change: regularize_all_learners_without_feature_change

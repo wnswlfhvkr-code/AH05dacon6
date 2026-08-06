@@ -1,0 +1,156 @@
+project:
+  name: AH05dacon6
+  experiment_name: test_006_pipeComb_em_v3_005
+  description: "v3_003의 전처리를 고정하고 개별 모델 전반에 완만한 규제를 분산한 하이퍼파라미터 실험"
+  seed: 42
+  python_version: "3.14"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_file: train.csv
+  test_file: test.csv
+  submission_file: sample_submission.csv
+  target_column: SUBCLASS
+  id_column: ID
+
+model:
+  name: pipecomb_oof_stacking
+  stacking_folds: 5
+  ensemble_method: regularized_stacking
+  class_weight_mode: sqrt_balanced
+  class_weight_power: 0.30
+  class_weight_clip: [0.90, 1.70]
+  early_stopping_fraction: 0.15
+  text_temperature: 1.25
+  xgboost_temperature: 1.20
+  lightgbm_temperature: 1.20
+  text_linear_svc:
+    C: 0.06
+    class_weight: balanced
+    max_iter: 20000
+    tol: 0.0001
+    dual: auto
+  emv46_xgboost:
+    objective: multi:softprob
+    n_estimators: 400
+    learning_rate: 0.020
+    max_depth: 3
+    min_child_weight: 10.0
+    subsample: 0.72
+    colsample_bytree: 0.50
+    reg_alpha: 2.0
+    reg_lambda: 20.0
+    max_delta_step: 1.0
+    eval_metric: mlogloss
+    tree_method: hist
+    n_jobs: -1
+    early_stopping_rounds: 40
+  emv46_lightgbm:
+    objective: multiclass
+    n_estimators: 320
+    learning_rate: 0.020
+    num_leaves: 9
+    max_depth: 4
+    min_child_samples: 55
+    subsample: 0.72
+    subsample_freq: 1
+    colsample_bytree: 0.45
+    reg_alpha: 2.5
+    reg_lambda: 22.0
+    n_jobs: -1
+    verbosity: -1
+    early_stopping_rounds: 40
+  meta_learner:
+    C: 0.018
+    solver: lbfgs
+    class_weight: balanced
+    max_iter: 3000
+
+output:
+  submission_dir: submissions
+  experiment_dir: experiments
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  overfit_threshold: 0.1
+  target_train_macro_f1_range: [0.78, 0.80]
+  target_validation_macro_f1_min: 0.5705
+  target_overfit_gap_max: 0.225
+
+preprocessing:
+  name: pipeComb_em_v3
+  text_parameters:
+    word_ngram_range: [1, 2]
+    word_min_df: 3
+    word_max_features: 180000
+    char_ngram_range: [3, 5]
+    char_min_df: 4
+    char_max_features: 120000
+    char_weight: 0.4
+    split_multi_event: false
+  emv46_parameters:
+    min_mutation_count: 5
+    min_functional_mutation_count: 5
+    min_feature_support: 2
+    top_genes_per_class: 20
+    smoothing: 0.5
+    max_log2_odds: 8.0
+    shrinkage: 10.0
+    min_hotspot_count: 5
+    max_hotspots: 384
+    inner_signature_folds: 5
+    signature_temperature: 1.0
+    signature_random_state: 42
+    random_state: 42
+    feature_parameters:
+      F05: {min_hotspot_count: 5, max_hotspots: 384}
+      F10: {min_feature_support: 2}
+      F12: {min_hotspot_count: 5, max_hotspots: 384}
+      F16: {top_genes_per_class: 20}
+      F17: {top_genes_per_class: 20}
+      F18: {top_genes_per_class: 20}
+      F19: {top_genes_per_class: 20}
+  jyp9_parameters:
+    f7_pairs: [[KIRC, KIPAN], [LGG, GBMLGG]]
+    f7_top_k_per_direction: 3
+    f7_min_gene_support: 10
+    f7_laplace_alpha: 4.0
+    f7_burden_quantiles: 5
+    f7_stability_folds: 5
+    f7_min_direction_consistency: 4
+    f7_min_selection_frequency: 3
+    f7_oof_folds: 5
+    f7_random_state: 42
+    f9_min_transition_support: 5
+    f9_max_transitions: 128
+    f9_burden_normalize: true
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_003
+  change_type: model_hyperparameters_only
+  unchanged_preprocessing: true
+  ensemble: [LinearSVC, XGBoost, LightGBM]
+  rationale:
+    - "LinearSVC C와 클래스 가중치를 완만하게 낮춰 희소 텍스트의 암기를 줄임"
+    - "XGBoost의 leaf 제약, 행·열 샘플링, L1/L2를 함께 강화"
+    - "LightGBM leaf 수와 최소 leaf 표본을 보수적으로 조정"
+    - "확률 temperature를 높여 과신을 완화하고 Meta L2는 소폭만 강화"
+  leakage_control: all_fit_and_selection_within_fold_train
+  external_data_used: false
+  test_fit_used: false
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: distributed_regularization_without_preprocessing_change

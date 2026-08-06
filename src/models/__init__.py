@@ -79,6 +79,12 @@ def create_pipecomb_oof_stacking(model_config: dict, seed: int):
     return create_model(model_config, seed)
 
 
+def create_pipecomb_tabpfn_subset_stacking(model_config: dict, seed: int):
+    from src.models.pipecomb_tabpfn_subset_stacking_model import create_model
+
+    return create_model(model_config, seed)
+
+
 MODEL_BUILDERS = {
     "logistic_regression": create_logistic_regression,
     "xgboost": create_xgboost,
@@ -93,4 +99,5 @@ MODEL_BUILDERS = {
     "pipecomb_ensemble": create_pipecomb_ensemble,
     "pipecomb_weighted_soft_voting": create_pipecomb_weighted_soft_voting,
     "pipecomb_oof_stacking": create_pipecomb_oof_stacking,
+    "pipecomb_tabpfn_subset_stacking": create_pipecomb_tabpfn_subset_stacking,
 }

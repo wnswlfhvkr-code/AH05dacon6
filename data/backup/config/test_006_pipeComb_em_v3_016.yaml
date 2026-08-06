@@ -1,0 +1,90 @@
+extends: test_006_pipeComb_em_v3_010.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_016
+  description: "v3_010 클래스 불균형 대응: fold-train effective-number 가중치를 모든 base/meta loss에 적용하고 복제 오버샘플링 제외"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  class_weight_mode: effective_number
+  effective_number_beta: 0.99
+  class_weight_clip: [0.80, 2.20]
+  base_sample_weight_enabled: true
+  postprocessing:
+    enabled: true
+    method: oof_class_prior_power
+    folds: 5
+    gamma_candidates: [-0.10, -0.05, 0.00, 0.05, 0.10]
+    temperature_candidates: [0.95, 1.00, 1.05]
+    minimum_oof_macro_f1_gain: 0.003
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_010
+  validation_macro_f1: 0.575911
+  train_macro_f1: 0.810407
+  overfit_gap: 0.234496
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_010
+  class_imbalance_strategy:
+    weighting:
+      method: effective_number_of_samples
+      beta: 0.99
+      normalized_mean_sample_weight: 1.0
+      clip: [0.80, 2.20]
+      statistics_source: each_fold_train_labels_only
+    weighted_losses:
+      linear_svc: class_weight
+      xgboost: sample_weight_multiclass_logloss
+      lightgbm: sample_weight_multiclass_logloss
+      meta_logistic: class_weight
+    probability_calibration:
+      method: conservative_oof_prior_power
+      minimum_required_oof_macro_f1_gain: 0.003
+      identity_fallback: true
+  excluded_methods:
+    focal_loss:
+      applied: false
+      reason: heterogeneous_linear_and_tree_base_models_no_common_stable_focal_objective
+    minority_batch_sampling:
+      applied: false
+      reason: current_estimators_are_not_minibatch_neural_networks
+    random_oversampling:
+      applied: false
+      reason: repeated_rare_mutation_patterns_can_increase_overfitting
+  validation_policy:
+    metric: macro_f1
+    stratified_stacking_folds: 5
+    compare_per_class_f1: true
+    monitor_minority_class_recall_and_precision: true
+  validation_or_test_used_for_weight_fit: false
+  test_distribution_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.575911
+  secondary: overfit_gap_less_than_0.234496
+  minority_safety:
+    - no_material_drop_in_majority_class_f1
+    - minority_macro_f1_gain_repeated_across_folds
+    - no_single_class_recall_gain_from_prediction_collapse
+  leakage_safety:
+    - class_weights_fit_on_fold_train_labels_only
+    - no_validation_or_test_class_counts_used
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: effective_number_weighted_base_and_meta_losses_without_oversampling

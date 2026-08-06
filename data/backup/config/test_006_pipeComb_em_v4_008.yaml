@@ -1,0 +1,44 @@
+extends: test_006_pipeComb_em_v4_004.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_008
+  description: "Step 3: 희소 텍스트·hotspot·F9의 저지지도 피처를 fold-train 기준으로 축소"
+
+preprocessing:
+  text_parameters:
+    word_min_df: 4
+    word_max_features: 160000
+    char_min_df: 6
+    char_max_features: 100000
+    char_weight: 0.30
+  emv46_parameters:
+    min_feature_support: 3
+    min_hotspot_count: 6
+    max_hotspots: 256
+    feature_parameters:
+      F05: {min_hotspot_count: 6, max_hotspots: 256}
+      F10: {min_feature_support: 3}
+      F12: {min_hotspot_count: 6, max_hotspots: 256}
+  jyp9_parameters:
+    f9_min_transition_support: 8
+    f9_max_transitions: 96
+
+training:
+  target_feature_count_max: 225000
+  target_validation_macro_f1_min: 0.565093
+  target_overfit_gap_max: 0.225
+
+experiment_design:
+  action_plan_step: 3
+  baseline: test_006_pipeComb_em_v4_004
+  change_only: fold_train_support_based_feature_reduction
+  supervised_global_importance_selection: false
+  reason: avoid_target_leakage_into_inner_stacking_oof
+  preserved_pair_features: [KIRC_KIPAN_F7, LGG_GBMLGG_F7]
+  minority_class_safety: keep_core_gene_threshold_at_5
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  intended_change: reduce_rare_text_hotspot_and_aa_transition_noise

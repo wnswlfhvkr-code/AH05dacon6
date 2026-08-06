@@ -1,0 +1,70 @@
+extends: test_006_pipeComb_em_v3_010.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_012
+  description: "v3_010 identity 후처리를 별도 cross-fit 검증형 클래스별 Macro-F1 threshold 보정으로 교체"
+
+execution:
+  status: design_only
+  train: false
+  evaluate: false
+  implementation_status: ready
+
+model:
+  postprocessing:
+    enabled: true
+    method: oof_crossfit_classwise_threshold
+    folds: 5
+    threshold_factor_candidates: [0.75, 0.85, 0.925, 1.0, 1.075, 1.15, 1.25]
+    coordinate_descent_rounds: 2
+    threshold_log_l2: 0.002
+    minimum_class_support: 25
+    minimum_oof_macro_f1_gain: 0.002
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_010
+  validation_macro_f1: 0.575911
+  train_macro_f1: 0.810407
+  overfit_gap: 0.234496
+  observed_postprocessing_effect: none_metrics_identical_to_v3_008
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_010
+  change_only: replace_prior_power_with_crossfit_classwise_thresholds
+  reason:
+    - v3_010_metrics_identical_to_v3_008
+    - global_prior_gamma_too_restrictive_for_class_specific_errors
+    - global_temperature_does_not_change_argmax_without_class_adjustment
+  postprocessing_input: separately_cross_fitted_meta_oof_probabilities
+  selection_objective: macro_f1_minus_log_threshold_l2
+  validation_method: second_level_stratified_cross_fitting
+  per_class_support_floor: 25
+  identity_factor: 1.0
+  minimum_oof_macro_f1_gain: 0.002
+  fallback_when_gain_insufficient: all_threshold_factors_1_no_postprocessing
+  target_or_probability_source: fold_train_only
+  test_distribution_used: false
+  test_prediction_counts_used: false
+  transductive_adjustment_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+acceptance_criteria:
+  primary: validation_macro_f1_greater_than_0.575911
+  secondary: overfit_gap_less_than_0.234496
+  safety:
+    - threshold_gain_reproduced_in_separate_cross_fitted_rows
+    - identity_fallback_when_gain_below_0.002
+    - no_validation_or_test_statistics_used
+    - no_class_remapping
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: crossfit_validated_macro_f1_classwise_threshold_postprocessing

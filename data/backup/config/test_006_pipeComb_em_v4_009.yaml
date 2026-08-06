@@ -1,0 +1,34 @@
+extends: test_006_pipeComb_em_v4_004.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_009
+  description: "Step 4: 기존 낮은 column sampling은 유지하고 row subsample만 0.65로 낮춘 무작위성 실험"
+
+model:
+  emv46_xgboost:
+    subsample: 0.65
+    colsample_bytree: 0.50
+  emv46_lightgbm:
+    subsample: 0.65
+    colsample_bytree: 0.45
+
+training:
+  target_train_macro_f1_max: 0.79
+  target_validation_macro_f1_min: 0.565093
+  target_overfit_gap_max: 0.225
+
+experiment_design:
+  action_plan_step: 4
+  baseline: test_006_pipeComb_em_v4_004
+  change_only: stronger_row_subsampling
+  requested_sampling_range: [0.6, 0.8]
+  xgboost_subsample: 0.65
+  lightgbm_subsample: 0.65
+  column_sampling_policy: preserve_existing_more_restrictive_values
+  reason_not_raise_colsample: raising_0.50_or_0.45_to_0.60_would_reduce_randomness
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  intended_change: inject_row_sampling_randomness_without_increasing_column_capacity

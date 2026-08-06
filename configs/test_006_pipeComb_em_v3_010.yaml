@@ -1,0 +1,49 @@
+extends: test_006_pipeComb_em_v3_008.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v3_010
+  description: "v3_008 스태킹의 cross-fitted meta OOF 확률로 제한적 class-prior 후처리를 선택"
+
+model:
+  postprocessing:
+    enabled: true
+    method: oof_class_prior_power
+    folds: 5
+    gamma_candidates: [-0.10, -0.05, 0.00, 0.05, 0.10]
+    temperature_candidates: [0.95, 1.00, 1.05]
+    minimum_oof_macro_f1_gain: 0.002
+
+training:
+  target_validation_macro_f1_min: 0.575911
+  target_overfit_gap_max: 0.225
+
+baseline_result:
+  experiment: test_006_pipeComb_em_v3_008
+  validation_macro_f1: 0.575911
+  train_macro_f1: 0.810407
+  overfit_gap: 0.234496
+
+experiment_design:
+  baseline: test_006_pipeComb_em_v3_008
+  change_only: cross_fitted_meta_probability_postprocessing
+  postprocessing_input: separately_cross_fitted_meta_oof_probabilities
+  postprocessing_method: bounded_class_prior_power_and_temperature
+  class_prior_source: fold_train_labels_only
+  candidate_count: 15
+  gamma_bounds: [-0.10, 0.10]
+  temperature_bounds: [0.95, 1.05]
+  identity_candidate_included: true
+  minimum_oof_macro_f1_gain: 0.002
+  fallback_when_gain_insufficient: identity_no_postprocessing
+  test_distribution_used: false
+  test_prediction_counts_used: false
+  transductive_adjustment_used: false
+  preserve_original_subclass: true
+  external_data_used: false
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  external_data_used: false
+  intended_change: conservative_oof_selected_postprocessing_with_identity_fallback

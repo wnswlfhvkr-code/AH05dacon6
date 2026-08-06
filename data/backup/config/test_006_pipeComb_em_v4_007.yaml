@@ -1,0 +1,34 @@
+extends: test_006_pipeComb_em_v4_004.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_007
+  description: "Step 2: 전처리를 outer train fold마다 다시 fit하는 엄격한 Stratified 5-Fold OOF 검증"
+
+preprocessing:
+  evaluation_folds: 5
+
+training:
+  validation_fraction: 0.2
+  stratify: true
+  metric: macro_f1
+  report_primary_metric: outer_oof_macro_f1
+
+experiment_design:
+  action_plan_step: 2
+  baseline: test_006_pipeComb_em_v4_004
+  change_only: strict_outer_stratified_5fold_oof
+  outer_folds: 5
+  inner_stacking_folds: 5
+  preprocessing_refit_per_outer_fold: true
+  validation_transform_only: true
+  supervised_signature_generation: inner_oof_within_outer_train
+  target_encoding_used: false
+  test_fit_used: false
+  expected_base_model_fit_count: 126
+  runtime_warning: nested_outer5_inner5_is_expected_to_be_about_3.5x_baseline
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  intended_change: obtain_leakage_checked_outer_oof_estimate

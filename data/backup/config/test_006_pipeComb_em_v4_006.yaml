@@ -1,0 +1,39 @@
+extends: test_006_pipeComb_em_v4_004.yaml
+
+project:
+  experiment_name: test_006_pipeComb_em_v4_006
+  description: "Step 1: v4_004 기반 tree 복잡도와 Meta L2를 한 단계 더 강화"
+
+model:
+  text_linear_svc:
+    C: 0.055
+  emv46_xgboost:
+    max_depth: 2
+    min_child_weight: 12.0
+    reg_alpha: 2.5
+    reg_lambda: 24.0
+  emv46_lightgbm:
+    num_leaves: 7
+    max_depth: 3
+    min_child_samples: 65
+    reg_alpha: 3.0
+    reg_lambda: 25.0
+  meta_learner:
+    C: 0.015
+
+training:
+  target_train_macro_f1_range: [0.77, 0.79]
+  target_validation_macro_f1_min: 0.565093
+  target_overfit_gap_max: 0.22
+
+experiment_design:
+  action_plan_step: 1
+  baseline: test_006_pipeComb_em_v4_004
+  change_only: stronger_base_and_meta_regularization
+  class_imbalance_strategy: preserve_sqrt_balanced_power_0.30
+
+record:
+  status: design_only
+  training_performed: false
+  evaluation_performed: false
+  intended_change: reduce_tree_and_meta_capacity
