@@ -173,6 +173,22 @@ r3가 기존 동결 primary에서 바꾼 최종 라벨은 2,546행 중 3행뿐�
 python -m src.reproduce_test_004 --config configs/test_004_6.yaml
 ```
 
+### TEST_004_8·9 VoteSelect 제출 재현
+
+Public 검증을 완료한 VoteSelect v1·v2는 각각 다음 설정과 파이프라인으로
+재현합니다. 확률 입력은 `models/TEST_004/vote_select_inputs.npz`에 최소 단위로
+버전 관리하며 실행 시 SHA-256과 원본 ID 순서를 검증합니다.
+
+```bash
+git lfs pull
+python -m src.reproduce_test_004_vote_select --config configs/test_004_8.yaml
+python -m src.reproduce_test_004_vote_select --config configs/test_004_9.yaml
+```
+
+- TEST_004_8: `pipeline_jsj_v10.py`, Public Macro F1 `0.4660597084`
+- TEST_004_9: `pipeline_jsj_v11.py`, Public Macro F1 `0.4535576457`
+- 상세 기록: `experiments/test_004_8_9.md`
+
 연구 파이프라인은 `em_v1~em_v43`이 등록되어 있습니다. `em_v15`는 5-fold OOF 평가를, `em_v16`은 학습 표본의 자기 정답 영향을 줄이는 inner-fold OOF signature를 적용합니다. `em_v17`은 셀 문자열 분리와 중복 토큰 제거 후 유전자별 mutation count, consequence, recurrent hotspot, multi-hit 피처를 생성합니다. `em_v18`은 동의 변이를 기능 변이 기반 유전자 선택·signature·hotspot에서 분리하며, `em_v19`는 em_v16 OOF signature와 안정 consequence를 결합합니다. `em_v20`은 기능 변이 지지도를 fold 내부에서 선택하고 안정 유전자에만 consequence one-hot을 적용합니다. `em_v21`은 고차원 원시 변이와 불안정 hotspot을 축소합니다. `em_v22`는 em_v16에 em_v26의 TCGA study-family coarse signature를, `em_v23`은 em_v16에 em_v27의 관련 study 내부 fine contrast를 중복 없이 결합합니다. `em_v24`는 em_v16의 전체 변이 신호와 em_v18의 기능 변이 신호를 단일 consequence 처리와 OOF 분할 안에서 분리해 결합합니다. `em_v25`는 em_v16의 OOF 암종 signature와 em_v17의 token count·multi-hit·hotspot을 단일 토큰 처리 흐름에서 결합하고 구조적으로 중복된 고상관 피처를 제거합니다. `em_v28`은 em_v16의 OOF signature에 em_v21의 원시 severity 상한·fold 안정 hotspot·비율 중심 compact summary를 중복 없이 결합합니다. `em_v29`는 em_v19에 이미 포함된 em_v16의 OOF·burden·severity·hotspot을 다시 만들지 않고 기능 변이 signature와 안정 consequence 흐름을 한 번만 유지합니다. `em_v30`은 em_v16에 em_v5의 전체 입력 유전자 burden total·rate만 추가합니다. `em_v31`은 em_v6 기능이 이미 포함된 em_v16 피처를 한 세트만 유지하고, `em_v32`는 em_v9 signature를 중복 생성하지 않고 em_v16의 OOF 개선형만 유지합니다. `em_v33`과 `em_v34`는 각각 em_v10·em_v11에서 중복되지 않는 전체 입력 burden total·rate만 추가합니다. `em_v35`는 em_v12의 피처를 중복 생성하지 않고 em_v16 OOF·hotspot 개선형을 유지하며, `em_v36`은 em_v13에서 중복되지 않는 전체 입력 burden total·rate만 추가합니다. `em_v37`은 em_v14의 severity·consequence·signature·hotspot을 다시 만들지 않고 em_v16의 inner-fold OOF 개선형을 한 세트만 유지합니다. `em_v38`은 em_v15의 outer 모델 평가 OOF와 em_v16의 inner signature OOF를 서로 다른 단계에 각각 한 번만 적용합니다. `em_v39`는 em_v6의 consequence·burden 중복을 제외하고 v24의 세분화된 dual signature 흐름만 유지하며, `em_v40`은 em_v9 signature를 중복 생성하지 않습니다. `em_v41`은 em_v12 severity·summary·signature를 다시 만들지 않습니다. `em_v42`와 `em_v43`은 em_v14·em_v15에서 v24와 겹치는 기능 hotspot을 제외하고 동의 변이 recurrent hotspot만 추가하며, em_v15의 outer OOF는 v24의 정책과 하나로 통합합니다. `em_v26`과 `em_v27`을 포함한 모든 TCGA 기반 파이프라인은 원본 26개 레이블을 변경하지 않습니다. 사용할 버전은 설정 YAML의 `preprocessing.name`으로 선택합니다.
 
 `em_v15` 이후 학습 결과에는 5-fold OOF 최종 Macro F1과 fold 평균·표준편차가 기록됩니다. 모든 버전에서 동일한 80% 학습 점수, 20% 검증 점수, 두 점수의 차이와 과적합 여부도 함께 출력됩니다.
