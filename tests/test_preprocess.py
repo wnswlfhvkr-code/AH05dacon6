@@ -27,6 +27,10 @@ from src.pipelines.jyp_preprocessing.pipeline_jyp_f10 import (
 from src.pipelines.jyp_preprocessing.pipeline_jyp_f11 import (
     discover_f11_confusion_pairs,
 )
+from src.pipelines.jyp_preprocessing.pipeline_pipe_comb_v3 import (
+    _build_signature_matrices,
+)
+from src.pipelines.pipeline_em_v24 import build_mutation_matrices
 from src.pipelines.preprocessing_registry import create_preprocessing_pipeline
 from src.validate_preprocessing_stability import (
     EM16_INTERNAL_SUMMARY_COLUMNS,
@@ -355,6 +359,8 @@ def test_pipe_comb_v3_adds_only_em24_dual_signatures_after_f9() -> None:
     em24_names = [name for name in feature_names if name.startswith("EM24__")]
 
     assert type(pipeline).__bases__ == (PreprocessingPipeline,)
+    assert not hasattr(pipeline, "em24_pipeline_")
+    assert pipeline.summary()["em24_summary"]["standalone_signature_block"] is True
     assert sparse.isspmatrix_csr(train_matrix)
     assert train_matrix.dtype == np.float32
     assert train_matrix.shape[1] == test_matrix.shape[1] == len(feature_names)
@@ -395,6 +401,25 @@ def test_pipe_comb_v3_adds_only_em24_dual_signatures_after_f9() -> None:
         restored.transform(features.iloc[:4]).toarray(),
         test_matrix.toarray(),
     )
+
+
+def test_pipe_comb_v3_fast_signature_scan_matches_em24_token_semantics() -> None:
+    features = pd.DataFrame({
+        "GENE_A": ["WT", " a1v ", None, "A2A", "Q3*", "R4fs"],
+        "GENE_B": [pd.NA, "WT", "A1V A1V", "DEL5", "<NA>", "wt"],
+    })
+
+    actual_mutation, actual_functional = _build_signature_matrices(
+        features,
+        features.columns.tolist(),
+    )
+    _, expected_mutation, expected_functional, _, _ = build_mutation_matrices(
+        features,
+        features.columns.tolist(),
+    )
+
+    pd.testing.assert_frame_equal(actual_mutation, expected_mutation)
+    pd.testing.assert_frame_equal(actual_functional, expected_functional)
 
 
 def test_jyp_pipeline_rejects_stage_and_irrelevant_parameters() -> None:

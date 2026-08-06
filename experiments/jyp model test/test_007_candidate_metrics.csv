@@ -1,0 +1,7 @@
+candidate_no,model,variant,evaluation,device,oof_macro_f1,base_macro_f1,combined_macro_f1,delta_macro_f1,holdout_macro_f1,train_macro_f1,overfit_gap,fold_std,runtime_seconds,status,notes
+1,TabM,global,strict_5fold_oof,GPU,0.457401787,,,,0.451830873,0.538115170,0.086284296,0.010249419,123.6,keep,"Best retained global candidate; only retained new candidate below gap 0.1"
+2,ModernNCA,global,strict_5fold_oof,GPU,0.372219745,,,,0.371888202,0.635220878,0.263332676,0.018152272,112.7,drop,"Global distance model overfits on current comb3 representation"
+2,ModernNCA,collision_expert,strict_5fold_oof,GPU,0.382598326,0.372219745,0.382598326,0.010378581,0.377614323,0.631360940,0.253746616,0.016706813,89.6,hold,"Expert direction works but absolute score remains low"
+3,RealMLP,global,strict_5fold_oof,GPU,0.434803913,,,,0.444947935,0.550559112,0.105611177,0.024013055,140.2,hold,"Keep only if OOF error diversity supports ensembling"
+4,RealTabR,collision_expert,strict_5fold_oof,GPU_base_CPU_expert,0.453173159,0.448778756,0.453173159,0.004394404,0.466210628,0.833972310,0.367761682,0.014785643,489.4,hold,"Positive but small gain; submission top1 contains 24 classes"
+5,xRFM,global,strict_5fold_oof,CPU,0.292941327,,,,0.282050337,0.729065030,0.447014693,0.015763843,106.7,drop,"Weak score and generalization under the current smoke budget"

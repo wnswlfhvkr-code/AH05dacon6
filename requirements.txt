@@ -3,8 +3,26 @@ PyYAML==6.0.2
 xgboost==3.3.0
 lightgbm==4.7.0
 catboost==1.2.10
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.13.0+cu130
+tabpfn==8.2.0
+tabicl==2.1.1
+tabfm[pytorch]==1.0.1
+tabm==0.0.3
+pytabkit==1.7.3
+faiss-cpu==1.14.3
+xrfm==0.4.5
+skorch==1.4.0
+pytorch-lightning==2.6.5
+TALENT @ git+https://github.com/LAMDA-Tabular/TALENT.git@08301d670a7c854bcf3a73298763484ba58eecdb
+category-encoders==2.10.0
+delu==0.0.26
+optuna==4.9.0
+qhoptim==1.1.0
+requests==2.34.2
 pandas==3.0.5
 scikit-learn==1.9.0
+imbalanced-learn==0.14.2
 numpy==2.5.1
 scipy==1.18.0
 jupyter

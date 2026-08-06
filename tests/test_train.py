@@ -45,6 +45,14 @@ def test_fit_model_rejects_early_stopping_without_validation_set() -> None:
         )
 
 
+def test_used_tree_count_returns_none_for_non_tree_model() -> None:
+    class NonTreeModelStub:
+        def get_params(self) -> dict:
+            return {"epochs": 10}
+
+    assert used_tree_count(NonTreeModelStub()) is None
+
+
 def test_split_preprocessing_config_separates_em_v20_support_cv() -> None:
     pipeline_config, tuning_config = split_preprocessing_config({
         "name": "em_v20",

@@ -64,14 +64,25 @@ def fit_model(
 
 
 def used_tree_count(model) -> int | None:
-    """트리 모델이면 실제 사용 tree 수를, 선형 모델이면 None을 반환합니다."""
+    """트리 모델의 실제 반복 수를 반환하고 비트리 모델은 ``None``으로 둡니다."""
     try:
         return int(model.best_iteration) + 1
     except (AttributeError, TypeError, ValueError):
-        parameters = model.get_params() if hasattr(model, "get_params") else {}
-        tree_count = parameters.get("n_estimators")
-        return None if tree_count is None else int(tree_count)
+        pass
 
+    try:
+        parameters = model.get_params()
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    for key in ("n_estimators", "iterations"):
+        value = parameters.get(key)
+        if value is not None:
+            return int(value)
+
+    return None
+  
+  
 
 def evaluate_stratified_oof(
     config: dict,
@@ -94,7 +105,7 @@ def evaluate_stratified_oof(
     oof_predictions = np.full(len(features), -1, dtype="int32")
     fold_scores: list[float] = []
     fold_train_scores: list[float] = []
-    fold_tree_counts: list[int] = []
+    fold_tree_counts: list[int | None] = []
     fold_preprocessing_selections: list[dict] = []
 
     for fold, (train_index, valid_index) in enumerate(
@@ -414,7 +425,11 @@ def main() -> None:
     encoded_features = preprocessor.fit_transform(features, labels)
     final_model_config = deepcopy(config)
     if final_model_config["model"].pop("early_stopping_rounds", None) is not None:
-        fold_tree_counts = oof_evaluation.get("fold_tree_counts", [])
+        fold_tree_counts = [
+            count
+            for count in oof_evaluation.get("fold_tree_counts", [])
+            if count is not None
+        ]
         if fold_tree_counts:
             final_model_config["model"]["n_estimators"] = int(
                 np.median(fold_tree_counts)

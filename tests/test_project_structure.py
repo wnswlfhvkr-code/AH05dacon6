@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from src.models import MODEL_BUILDERS
 from src.pipelines.preprocessing_registry import PIPELINES
 
 
@@ -184,6 +185,166 @@ def test_test_003_config_uses_registered_jyp_pipeline() -> None:
     assert PIPELINES[pipeline_name].__module__.endswith(
         "jyp_preprocessing.pipeline_pipe_comb_v4"
     )
+
+
+def test_test_007_is_pipecomb_v3_catboost_gpu_model_lane() -> None:
+    config_path = ROOT / "configs" / "test_007.yaml"
+
+    with config_path.open(encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    assert config["project"]["experiment_name"] == "test_007_catboost_c1"
+    assert config["model"]["name"] == "catboost"
+    assert config["model"]["name"] in MODEL_BUILDERS
+    assert config["model"]["task_type"] == "GPU"
+    assert config["model"]["devices"] == "0"
+    assert "early_stopping_rounds" not in config["model"]
+    assert config["preprocessing"]["name"] == "pipeComb_v3"
+    assert PIPELINES["pipeComb_v3"].__module__.endswith(
+        "jyp_preprocessing.pipeline_pipe_comb_v3"
+    )
+
+
+def test_test_007_xgboost_c1_is_comparable_gpu_baseline() -> None:
+    root_config_path = ROOT / "configs" / "test_007.yaml"
+    xgboost_config_path = (
+        ROOT / "data" / "backup" / "yaml" / "test_007_xgboost_c1.yaml"
+    )
+
+    with root_config_path.open(encoding="utf-8") as file:
+        catboost_config = yaml.safe_load(file)
+    with xgboost_config_path.open(encoding="utf-8") as file:
+        xgboost_config = yaml.safe_load(file)
+
+    assert xgboost_config["project"]["experiment_name"] == "test_007_xgboost_c1"
+    assert xgboost_config["project"]["seed"] == catboost_config["project"]["seed"]
+    assert xgboost_config["data"] == catboost_config["data"]
+    assert xgboost_config["training"] == catboost_config["training"]
+    assert xgboost_config["preprocessing"] == catboost_config["preprocessing"]
+    assert xgboost_config["model"]["name"] == "xgboost"
+    assert xgboost_config["model"]["name"] in MODEL_BUILDERS
+    assert xgboost_config["model"]["device"] == "cuda"
+    assert xgboost_config["model"]["tree_method"] == "hist"
+
+
+@pytest.mark.parametrize(
+    ("filename", "experiment_name", "model_name", "device_key", "device_value"),
+    [
+        (
+            "test_007_tabicl_global_c1.yaml",
+            "test_007_tabicl_global_c1",
+            "tabicl",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_tabicl_expert_c1.yaml",
+            "test_007_tabicl_expert_c1",
+            "tabicl_collision_expert",
+            "expert_device",
+            "cuda",
+        ),
+        (
+            "test_007_tabfm_expert_c1.yaml",
+            "test_007_tabfm_expert_c1",
+            "tabfm_collision_expert",
+            "expert_device",
+            "cuda",
+        ),
+        (
+            "test_007_logistic_gpu_c1.yaml",
+            "test_007_logistic_gpu_c1",
+            "logistic_regression_gpu",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_torch_linear_c1.yaml",
+            "test_007_torch_linear_c1",
+            "torch_linear",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_torch_mlp_c1.yaml",
+            "test_007_torch_mlp_c1",
+            "torch_mlp",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_tabpfn_c1.yaml",
+            "test_007_tabpfn_c1",
+            "tabpfn",
+            "expert_device",
+            "cuda",
+        ),
+        (
+            "test_007_lightgbm_c1.yaml",
+            "test_007_lightgbm_c1",
+            "lightgbm",
+            "device_type",
+            "cpu",
+        ),
+        (
+            "test_007_tabm_global_c1.yaml",
+            "test_007_tabm_global_c1",
+            "tabm",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_modernnca_global_c1.yaml",
+            "test_007_modernnca_global_c1",
+            "modernnca",
+            "device",
+            "cuda",
+        ),
+        (
+            "test_007_realmlp_global_c1.yaml",
+            "test_007_realmlp_global_c1",
+            "realmlp",
+            "device",
+            "cuda:0",
+        ),
+        (
+            "test_007_realtabr_expert_c1.yaml",
+            "test_007_realtabr_expert_c1",
+            "realtabr_collision_expert",
+            "expert_device",
+            "cpu",
+        ),
+        (
+            "test_007_xrfm_c1.yaml",
+            "test_007_xrfm_c1",
+            "xrfm",
+            "device",
+            "cpu",
+        ),
+    ],
+)
+def test_test_007_model_candidates_share_the_same_evaluation_contract(
+    filename: str,
+    experiment_name: str,
+    model_name: str,
+    device_key: str,
+    device_value: str,
+) -> None:
+    with (ROOT / "configs" / "test_007.yaml").open(encoding="utf-8") as file:
+        reference = yaml.safe_load(file)
+    with (ROOT / "data" / "backup" / "yaml" / filename).open(
+        encoding="utf-8"
+    ) as file:
+        candidate = yaml.safe_load(file)
+
+    assert candidate["project"]["experiment_name"] == experiment_name
+    assert candidate["project"]["seed"] == reference["project"]["seed"]
+    assert candidate["data"] == reference["data"]
+    assert candidate["training"] == reference["training"]
+    assert candidate["preprocessing"] == reference["preprocessing"]
+    assert candidate["model"]["name"] == model_name
+    assert model_name in MODEL_BUILDERS
+    assert candidate["model"][device_key] == device_value
 
 
 def test_only_core_pipecomb_versions_are_selectable_and_jh_is_original() -> None:
